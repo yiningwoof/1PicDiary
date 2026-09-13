@@ -1,6 +1,14 @@
 import { NextResponse } from "next/server";
 
-import { composeDiaryImage, TextPosition } from "@/lib/image";
+import {
+  composeDiaryImage,
+  isFontFamilyKey,
+  resolveFontScale,
+  resolveStrokeColor,
+  resolveStrokeWidth,
+  resolveTextColor,
+  TextPosition,
+} from "@/lib/image";
 
 export const runtime = "nodejs";
 
@@ -9,7 +17,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
 
     const file = formData.get("photo");
-    const childName = String(formData.get("childName") ?? "孩子");
+    const childName = String(formData.get("childName") ?? "Child");
     const diaryText = String(formData.get("diaryText") ?? "");
     const textPosition = String(formData.get("textPosition") ?? "bottom") as TextPosition;
 
@@ -25,12 +33,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid textPosition" }, { status: 400 });
     }
 
+    const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
     const composed = await composeDiaryImage({
       imageBuffer,
       childName,
       diaryText,
       textPosition,
+      fontFamily: isFontFamilyKey(fontFamilyInput) ? fontFamilyInput : undefined,
+      fontScale: resolveFontScale(formData.get("fontScale")),
+      textColor: resolveTextColor(formData.get("textColor")),
+      strokeColor: resolveStrokeColor(formData.get("strokeColor")),
+      strokeWidth: resolveStrokeWidth(formData.get("strokeWidth")),
     });
 
     return new Response(new Uint8Array(composed), {

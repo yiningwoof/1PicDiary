@@ -2,7 +2,15 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getOrCreateAlbum, uploadPhotoToGooglePhotos } from "@/lib/google-photos";
-import { composeDiaryImage, TextPosition } from "@/lib/image";
+import {
+  composeDiaryImage,
+  isFontFamilyKey,
+  resolveFontScale,
+  resolveStrokeColor,
+  resolveStrokeWidth,
+  resolveTextColor,
+  TextPosition,
+} from "@/lib/image";
 import { sanitizeFileSegment } from "@/lib/security";
 import { getSupabaseServerClient } from "@/lib/supabase";
 
@@ -23,7 +31,7 @@ export async function POST(request: Request) {
     const formData = await request.formData();
 
     const file = formData.get("photo");
-    const childName = String(formData.get("childName") ?? "孩子").trim();
+    const childName = String(formData.get("childName") ?? "Child").trim();
     const diaryText = String(formData.get("diaryText") ?? "").trim();
     const textPosition = String(formData.get("textPosition") ?? "bottom") as TextPosition;
     const albumTitle = String(formData.get("albumTitle") ?? "1PicDiary").trim();
@@ -40,6 +48,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid textPosition" }, { status: 400 });
     }
 
+    const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
     const safeChildName = sanitizeFileSegment(childName, "child");
     const composed = await composeDiaryImage({
@@ -47,6 +56,11 @@ export async function POST(request: Request) {
       childName,
       diaryText,
       textPosition,
+      fontFamily: isFontFamilyKey(fontFamilyInput) ? fontFamilyInput : undefined,
+      fontScale: resolveFontScale(formData.get("fontScale")),
+      textColor: resolveTextColor(formData.get("textColor")),
+      strokeColor: resolveStrokeColor(formData.get("strokeColor")),
+      strokeWidth: resolveStrokeWidth(formData.get("strokeWidth")),
     });
 
     const albumId = await getOrCreateAlbum(accessToken, albumTitle);
