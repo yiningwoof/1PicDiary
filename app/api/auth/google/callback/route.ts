@@ -10,17 +10,21 @@ export async function GET(request: Request) {
   const cookieStore = await cookies();
   const expectedState = cookieStore.get("google_oauth_state")?.value;
 
+  if (url.searchParams.has("error")) {
+    return NextResponse.redirect(new URL("/connect-google-photos?auth=cancelled", url.origin));
+  }
+
   if (!code) {
-    return NextResponse.redirect(new URL("/?auth=missing_code", url.origin));
+    return NextResponse.redirect(new URL("/connect-google-photos?auth=missing_code", url.origin));
   }
 
   if (!state || !expectedState || state !== expectedState) {
-    return NextResponse.redirect(new URL("/?auth=state_error", url.origin));
+    return NextResponse.redirect(new URL("/connect-google-photos?auth=state_error", url.origin));
   }
 
   try {
     const token = await exchangeCodeForToken(code);
-    const response = NextResponse.redirect(new URL("/?auth=ok", url.origin));
+    const response = NextResponse.redirect(new URL("/connect-google-photos?auth=ok", url.origin));
 
     response.cookies.set("google_access_token", token.access_token, {
       httpOnly: true,
@@ -34,6 +38,6 @@ export async function GET(request: Request) {
 
     return response;
   } catch {
-    return NextResponse.redirect(new URL("/?auth=token_error", url.origin));
+    return NextResponse.redirect(new URL("/connect-google-photos?auth=token_error", url.origin));
   }
 }

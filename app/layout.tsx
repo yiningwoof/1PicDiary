@@ -4,12 +4,13 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: '1PicDiary',
-  description: 'One photo diary per kid per day',
+  description:
+    'Photo diaries for the people, relationships, pets, and moments in your life',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang='en' className='h-full antialiased'>
+    <html lang='zh-CN' className='h-full antialiased'>
       <body className='min-h-full bg-gray-50 text-gray-900'>{children}</body>
     </html>
   );
