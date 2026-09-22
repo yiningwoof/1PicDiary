@@ -29,7 +29,7 @@ describe("POST /api/save-diary", () => {
     cookiesMock.mockResolvedValue({ get: vi.fn(() => ({ value: "token" })) });
 
     const formData = new FormData();
-    formData.set("childName", "大宝");
+    formData.set("subjectName", "大宝");
     formData.set("diaryText", "今天开心");
     formData.set("textPosition", "bottom");
     formData.set("albumTitle", "1PicDiary");

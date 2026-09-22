@@ -18,7 +18,7 @@ describe("composeDiaryImage", () => {
 
     const output = await composeDiaryImage({
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心",
       textPosition: "bottom",
     });
@@ -45,7 +45,7 @@ describe("composeDiaryImage", () => {
 
     const baseOptions = {
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -73,7 +73,7 @@ describe("composeDiaryImage", () => {
 
     const baseOptions = {
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -108,7 +108,7 @@ describe("composeDiaryImage", () => {
 
     const baseOptions = {
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -144,7 +144,7 @@ describe("composeDiaryImage", () => {
 
     const baseOptions = {
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -211,7 +211,7 @@ describe("composeDiaryImage with long text", () => {
 
     const baseOptions = {
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       textPosition: "bottom" as const,
     };
 
@@ -246,7 +246,7 @@ describe("composeDiaryImage with long text", () => {
 
     const output = await composeDiaryImage({
       imageBuffer: input,
-      childName: "大宝",
+      subjectName: "大宝",
       diaryText: "今天很开心".repeat(60),
       textPosition: "middle",
       fontScale: 2.5,

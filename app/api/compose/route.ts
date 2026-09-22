@@ -1,3 +1,4 @@
+import { parseTextLayout, LayoutValidationError } from '@/lib/text-layout';
 import { NextResponse } from "next/server";
 
 import {
@@ -16,9 +17,10 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData();
 
+    const textLayout = parseTextLayout(formData.get("textLayout"));
     const file = formData.get("photo");
-    const childName = String(formData.get("childName") ?? "Child");
-    const diaryText = String(formData.get("diaryText") ?? "");
+    const subjectName = String(formData.get("subjectName") ?? "Subject");
+    const diaryText = String(formData.get("diaryText") ?? "").trim();
     const textPosition = String(formData.get("textPosition") ?? "bottom") as TextPosition;
 
     if (!(file instanceof File)) {
@@ -33,13 +35,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid textPosition" }, { status: 400 });
     }
 
+    if (file.size > 30 * 1024 * 1024 || diaryText.length > 80 || subjectName.length > 80) {
+      return NextResponse.json({ error: 'Choose a photo up to 30 MB and a diary line up to 80 characters.' }, { status: 400 });
+    }
     const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
     const composed = await composeDiaryImage({
       imageBuffer,
-      childName,
+      subjectName,
       diaryText,
       textPosition,
+      textLayout,
       fontFamily: isFontFamilyKey(fontFamilyInput) ? fontFamilyInput : undefined,
       fontScale: resolveFontScale(formData.get("fontScale")),
       textColor: resolveTextColor(formData.get("textColor")),
@@ -56,7 +62,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "compose failed" },
-      { status: 500 }
+      { status: error instanceof LayoutValidationError ? 400 : 500 }
     );
   }
 }
