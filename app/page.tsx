@@ -1,37 +1,50 @@
-"use client";
+'use client';
 
-import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
+import { SubjectDiaries } from '@/components/subject-diaries';
+import { localDiaryDate, isDiaryDate } from '@/lib/diary-date';
+import type { DiarySubject } from '@/lib/subjects';
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 
-const DEFAULT_CHILDREN = ["大宝", "二宝"];
-type TextPosition = "top" | "middle" | "bottom";
+import { TextLayoutEditor } from '@/components/text-layout-editor';
+import type { TextLayout } from '@/lib/text-layout';
 
 export default function Home() {
-  const [childName, setChildName] = useState(DEFAULT_CHILDREN[0]);
-  const [diaryText, setDiaryText] = useState("");
-  const [albumTitle, setAlbumTitle] = useState("1PicDiary");
-  const [textPosition, setTextPosition] = useState<TextPosition>("bottom");
+  return (
+    <SubjectDiaries>
+      {(subject) => <DiaryEditor subject={subject} />}
+    </SubjectDiaries>
+  );
+}
+
+function DiaryEditor({ subject }: { subject: DiarySubject }) {
+  const subjectName = subject.name;
+  const albumTitle = subject.diary_album_title;
+  const [diaryDate, setDiaryDate] = useState(() => localDiaryDate());
+  const [diaryText, setDiaryText] = useState('');
+  const [layout, setLayout] = useState<TextLayout | null>(null);
+  const [layoutReady, setLayoutReady] = useState(false);
+  const [photoVersion, setPhotoVersion] = useState(0);
   const [photo, setPhoto] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>("");
+  const [status, setStatus] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
 
-  const sourcePreviewUrl = useMemo(
-    () => (photo ? URL.createObjectURL(photo) : null),
-    [photo]
+  const [layoutText, setLayoutText] = useState('');
+  const onLayoutChange = useCallback(
+    (next: TextLayout | null, ready: boolean) => {
+      setLayoutText(diaryText);
+      setLayout(next);
+      setLayoutReady(ready);
+      setPreviewUrl(null);
+    },
+    [diaryText],
   );
-
-  useEffect(() => {
-    return () => {
-      if (sourcePreviewUrl) {
-        URL.revokeObjectURL(sourcePreviewUrl);
-      }
-    };
-  }, [sourcePreviewUrl]);
 
   useEffect(
     () => () => {
@@ -39,176 +52,232 @@ export default function Home() {
         URL.revokeObjectURL(previewUrl);
       }
     },
-    [previewUrl]
+    [previewUrl],
   );
 
   async function generatePreview() {
-    if (!photo || !diaryText.trim()) {
-      setStatus("请先上传照片并输入一句日记。");
+    if (
+      !photo ||
+      !diaryText.trim() ||
+      !layout ||
+      !layoutReady ||
+      layoutText !== diaryText
+    ) {
+      setStatus(
+        'Add a photo and diary line, then wait for the text layout to finish updating.',
+      );
       return;
     }
 
-    setStatus("正在生成预览...");
-    const formData = new FormData();
-    formData.set("photo", photo);
-    formData.set("childName", childName);
-    formData.set("diaryText", diaryText);
-    formData.set("textPosition", textPosition);
+    setPreviewing(true);
+    setStatus('Generating preview...');
+    try {
+      const formData = new FormData();
+      formData.set('photo', photo);
+      formData.set('subjectName', subjectName);
+      formData.set('diaryText', diaryText);
+      formData.set('textLayout', JSON.stringify(layout));
+      const response = await fetch('/api/compose', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const response = await fetch("/api/compose", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      setStatus(payload.error ?? "预览失败");
-      return;
-    }
-
-    const blob = await response.blob();
-    const nextPreviewUrl = URL.createObjectURL(blob);
-    setPreviewUrl((previous) => {
-      if (previous) {
-        URL.revokeObjectURL(previous);
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        setStatus(payload.error ?? 'Preview failed');
+        return;
       }
-      return nextPreviewUrl;
-    });
-    setStatus("预览已生成。确认后可保存到 Google Photos。");
+
+      const blob = await response.blob();
+      const nextPreviewUrl = URL.createObjectURL(blob);
+      setPreviewUrl((previous) => {
+        if (previous) {
+          URL.revokeObjectURL(previous);
+        }
+        return nextPreviewUrl;
+      });
+      setStatus('Preview ready. You can now save it to Google Photos.');
+    } catch {
+      setStatus(
+        'Preview could not be generated. Your draft is still here; please retry.',
+      );
+    } finally {
+      setPreviewing(false);
+    }
   }
 
   async function saveDiary() {
-    if (!photo || !diaryText.trim()) {
-      setStatus("请先上传照片并输入一句日记。");
+    if (
+      !photo ||
+      !diaryText.trim() ||
+      !layout ||
+      !layoutReady ||
+      layoutText !== diaryText
+    ) {
+      setStatus(
+        'Add a photo and diary line, then wait for the text layout to finish updating.',
+      );
+      return;
+    }
+
+    if (!isDiaryDate(diaryDate)) {
+      setStatus('Please choose a valid diary date.');
       return;
     }
 
     setSaving(true);
-    setStatus("正在保存到 Google Photos...");
+    setStatus(`Saving to ${albumTitle}...`);
+    try {
+      const formData = new FormData();
+      formData.set('photo', photo);
+      formData.set('subjectName', subjectName);
+      formData.set('diaryText', diaryText);
+      formData.set('textLayout', JSON.stringify(layout));
+      formData.set('subjectId', subject.id);
+      formData.set('diaryDate', diaryDate);
 
-    const formData = new FormData();
-    formData.set("photo", photo);
-    formData.set("childName", childName);
-    formData.set("diaryText", diaryText);
-    formData.set("textPosition", textPosition);
-    formData.set("albumTitle", albumTitle);
+      const response = await fetch('/api/save-diary', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const response = await fetch("/api/save-diary", {
-      method: "POST",
-      body: formData,
-    });
+      const payload = await response.json().catch(() => ({}));
 
-    const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setStatus(payload.error ?? 'Save failed');
+        setSaving(false);
+        return;
+      }
 
-    if (!response.ok) {
-      setStatus(payload.error ?? "保存失败");
+      const warnings = payload.warnings?.length
+        ? ` (warnings: ${payload.warnings.join('; ')})`
+        : '';
+      setStatus(
+        `Saved diary entry for ${subjectName} to ${albumTitle}.${warnings}`,
+      );
+    } catch {
+      setStatus(
+        'The save could not be confirmed. Check the album before retrying; your draft is still here.',
+      );
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const warnings = payload.warnings?.length
-      ? `（附加提示：${payload.warnings.join("；")}）`
-      : "";
-    setStatus(`保存成功，MediaItemId: ${payload.mediaItemId ?? "N/A"}${warnings}`);
-    setSaving(false);
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
-      <h1 className="text-2xl font-bold">1PicDiary</h1>
-      <p className="text-sm text-gray-600">
-        选择孩子、上传一张照片、输入一句日记、调整文字位置，预览后保存到 Google Photos App Album。
-      </p>
-
-      <div className="grid gap-3 rounded-lg border border-gray-200 p-4">
-        <label className="text-sm font-medium">Google 连接</label>
-        <a className="text-sm text-blue-600 underline" href="/api/auth/google/start">
-          连接 Google Photos
-        </a>
+    <div className='grid gap-4'>
+      <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-950'>
+        <h2 className='text-lg font-semibold'>
+          2. Create a diary entry for {subjectName}
+        </h2>
+        <p className='mt-1 break-words text-sm'>
+          Saving to: <strong>{albumTitle}</strong>
+        </p>
+        {subject.save_originals && (
+          <p className='mt-1 break-words text-sm'>
+            Original photos: <strong>{subject.originals_album_title}</strong>
+          </p>
+        )}
       </div>
-
-      <div className="grid gap-3 rounded-lg border border-gray-200 p-4">
-        <label className="text-sm font-medium">孩子</label>
-        <select
-          className="h-9 rounded-md border border-gray-300 px-3"
-          value={childName}
-          onChange={(event) => setChildName(event.target.value)}
-        >
-          {DEFAULT_CHILDREN.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
-        </select>
-
-        <label className="text-sm font-medium">照片</label>
+      <fieldset
+        disabled={saving || previewing}
+        className='grid min-w-0 gap-3 rounded-lg border border-gray-200 p-4'
+      >
+        <label htmlFor={`${subject.id}-date`} className='text-sm font-medium'>
+          Diary date
+        </label>
         <Input
-          type="file"
-          accept="image/*"
-          onChange={(event) => setPhoto(event.target.files?.[0] ?? null)}
+          id={`${subject.id}-date`}
+          type='date'
+          required
+          min='0001-01-01'
+          max='9999-12-31'
+          value={diaryDate}
+          onChange={(event) => setDiaryDate(event.target.value)}
+        />
+        <p className='text-sm text-gray-600'>
+          The day this memory happened, even if you are saving it later.
+        </p>
+        <label htmlFor={`${subject.id}-photo`} className='text-sm font-medium'>
+          Photo
+        </label>
+        <Input
+          id={`${subject.id}-photo`}
+          type='file'
+          accept='image/*'
+          onChange={(event) => {
+            setPhoto(event.target.files?.[0] ?? null);
+            setPhotoVersion((v) => v + 1);
+            setLayout(null);
+            setLayoutReady(false);
+            setPreviewUrl(null);
+          }}
         />
 
-        <label className="text-sm font-medium">一句日记</label>
+        <label htmlFor={`${subject.id}-diary`} className='text-sm font-medium'>
+          Diary line
+        </label>
         <Textarea
+          id={`${subject.id}-diary`}
           value={diaryText}
-          onChange={(event) => setDiaryText(event.target.value)}
+          onChange={(event) => {
+            setDiaryText(event.target.value);
+            setLayoutReady(false);
+            setPreviewUrl(null);
+          }}
           maxLength={80}
-          placeholder="例如：今天和妹妹一起搭积木，笑得很开心。"
+          placeholder='例如：今天和妹妹一起搭积木，笑得很开心。'
         />
 
-        <label className="text-sm font-medium">文字位置</label>
-        <select
-          className="h-9 rounded-md border border-gray-300 px-3"
-          value={textPosition}
-          onChange={(event) => setTextPosition(event.target.value as TextPosition)}
-        >
-          <option value="top">上方</option>
-          <option value="middle">中间</option>
-          <option value="bottom">下方</option>
-        </select>
-
-        <label className="text-sm font-medium">Google Photos Album 标题</label>
-        <Input value={albumTitle} onChange={(event) => setAlbumTitle(event.target.value)} />
-
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" onClick={generatePreview}>
-            预览合成图
+        {photo && diaryText.trim() && (
+          <TextLayoutEditor
+            key={photoVersion}
+            photo={photo}
+            text={`${subjectName}: ${diaryText.trim()}`}
+            disabled={saving || previewing}
+            onChange={onLayoutChange}
+          />
+        )}
+        <div className='flex flex-wrap gap-2'>
+          <Button
+            type='button'
+            variant='outline'
+            onClick={generatePreview}
+            disabled={!layoutReady || layoutText !== diaryText}
+          >
+            {previewing ? 'Generating preview…' : 'Preview composed image'}
           </Button>
-          <Button type="button" onClick={saveDiary} disabled={saving}>
-            {saving ? "保存中..." : "保存到 Google Photos"}
+          <Button
+            type='button'
+            onClick={saveDiary}
+            disabled={saving || !layoutReady || layoutText !== diaryText}
+          >
+            {saving ? 'Saving...' : 'Save to Google Photos'}
           </Button>
         </div>
-      </div>
+      </fieldset>
 
-      <div className="grid gap-3 rounded-lg border border-gray-200 p-4">
-        <h2 className="text-sm font-medium">预览</h2>
-        {sourcePreviewUrl ? (
-          <Image
-            src={sourcePreviewUrl}
-            alt="原图预览"
-            width={800}
-            height={800}
-            unoptimized
-            className="max-h-96 w-auto rounded-md object-contain"
-          />
-        ) : (
-          <p className="text-sm text-gray-500">尚未选择图片</p>
-        )}
+      <div className='grid gap-3 rounded-lg border border-gray-200 p-4'>
+        <h2 className='text-sm font-medium'>Preview</h2>
         {previewUrl ? (
           <Image
             src={previewUrl}
-            alt="合成图预览"
+            alt='合成图预览'
             width={800}
             height={800}
             unoptimized
-            className="max-h-96 w-auto rounded-md object-contain"
+            className='max-h-96 w-auto rounded-md object-contain'
           />
         ) : (
-          <p className="text-sm text-gray-500">尚未生成合成预览</p>
+          <p className='text-sm text-gray-500'>尚未生成合成预览</p>
         )}
       </div>
 
-      {status ? <p className="text-sm text-gray-700">{status}</p> : null}
-    </main>
+      {status ? (
+        <p role='status' className='text-sm text-gray-700'>
+          {status}
+        </p>
+      ) : null}
+    </div>
   );
 }

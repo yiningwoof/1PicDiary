@@ -3,6 +3,7 @@ export const GOOGLE_SCOPES = [
   "email",
   "profile",
   "https://www.googleapis.com/auth/photoslibrary.appendonly",
+  "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
 ].join(" ");
 
 export function buildGoogleOAuthUrl(state: string) {

@@ -65,18 +65,20 @@ export async function uploadPhotoToGooglePhotos({
   albumId,
   fileName,
   imageBuffer,
+  mimeType = "image/png",
 }: {
   accessToken: string;
   albumId: string;
   fileName: string;
   imageBuffer: Buffer;
+  mimeType?: string;
 }) {
   const uploadResponse = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
     method: "POST",
     headers: {
       Authorization: ["Bearer", accessToken].join(" "),
       "Content-type": "application/octet-stream",
-      "X-Goog-Upload-Content-Type": "image/png",
+      "X-Goog-Upload-Content-Type": mimeType,
       "X-Goog-Upload-Protocol": "raw",
       "X-Goog-Upload-File-Name": fileName,
     },
@@ -90,19 +92,22 @@ export async function uploadPhotoToGooglePhotos({
   const uploadToken = await uploadResponse.text();
 
   const batch = await photosFetch<{
-    newMediaItemResults?: Array<{ mediaItem?: { id: string } }>;
+    newMediaItemResults?: Array<{ status?: { code?: number }; mediaItem?: { id: string } }>;
   }>(accessToken, "/mediaItems:batchCreate", {
     method: "POST",
     body: JSON.stringify({
       albumId,
       newMediaItems: [
         {
-          description: "1PicDiary auto-generated photo diary",
-          simpleMediaItem: { uploadToken },
+          simpleMediaItem: { uploadToken, fileName },
         },
       ],
     }),
   });
 
-  return batch.newMediaItemResults?.[0]?.mediaItem?.id ?? null;
+  const result = batch.newMediaItemResults?.[0];
+  if (result?.status?.code || !result?.mediaItem?.id) {
+    throw new Error("Google Photos could not save this image to the subject’s album. Check that the album still exists and reconnect if needed.");
+  }
+  return result.mediaItem.id;
 }
