@@ -3,6 +3,7 @@
 # Pin the Node and Linux versions so Sharp installs the same native Linux
 # binaries in every build.
 FROM node:22.23.2-bookworm-slim AS dependencies
+WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY package.json package-lock.json ./
