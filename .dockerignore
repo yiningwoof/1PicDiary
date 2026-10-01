@@ -1,0 +1,17 @@
+.git
+.gitignore
+.next
+node_modules
+
+# Never send local credentials to the Docker build context.
+.env
+.env.*
+
+coverage
+playwright-report
+test-results
+*.log
+*.tsbuildinfo
+
+docs
+tests

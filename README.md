@@ -1,21 +1,23 @@
 # 1PicDiary
 
-一个基于 Next.js 的 Web App：
-- 在手机上选择日记主题（自己、孩子、婚姻或宠物等）
-- 上传一张照片并输入一句日记
-- 选择文字位置并预览合成图
-- 保存到 Google Photos 的指定 app album
+A Next.js web application for creating one-photo diary entries:
+
+- Select a diary subject on a phone or computer.
+- Upload a photo and enter a short diary note.
+- Position the text and preview the composed image.
+- Save the finished image to the subject's Google Photos album.
+- Optionally preserve the unchanged original in a separate album.
 
 ## Tech Stack
 
 - Next.js + TypeScript
-- Tailwind CSS + shadcn/ui 风格组件
-- Sharp（图片合成）
-- Supabase（Postgres）
+- Tailwind CSS with shadcn/ui-style components
+- Sharp for image composition
+- Supabase Postgres for diary metadata
 - Google OAuth + Google Photos Library API
-- Testing: Vitest + Playwright
+- Vitest + Playwright for testing
 
-## 环境变量
+## Environment variables
 
 ```bash
 GOOGLE_CLIENT_ID=
@@ -26,18 +28,46 @@ SUPABASE_URL=
 SUPABASE_SECRET_KEY=
 ```
 
-## 运行
+Keep these variables in `.env.local` for local development. They are read only
+by the Next.js server. Do not add `NEXT_PUBLIC_` to either Supabase variable,
+and never commit `.env.local`.
+
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-访问 `http://localhost:3000`。
+Open `http://localhost:3000`.
 
-## Supabase 表结构
+## Production container
 
-将 `supabase/schema.sql` 内容粘贴到 Supabase SQL Editor 执行。
+The production image uses Next.js standalone output and a pinned Debian-based
+Node.js runtime so Sharp installs and runs with its Linux native dependencies.
+Local secrets are excluded from the Docker build context.
+
+Build the image:
+
+```bash
+docker build -t 1picdiary .
+```
+
+Run the same image locally with the server-only settings from `.env.local`:
+
+```bash
+docker run --rm --env-file .env.local -p 8080:8080 1picdiary
+```
+
+Then visit `http://localhost:8080`. The local Google OAuth redirect URI must
+match that port when testing OAuth through the container. In Cloud Run, inject
+`GOOGLE_CLIENT_SECRET` and `SUPABASE_SECRET_KEY` from Secret Manager and set
+`GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`, and `SUPABASE_URL` as runtime
+configuration. Do not bake any of them into the image.
+
+## Supabase schema
+
+Copy `supabase/schema.sql` into the Supabase SQL Editor and run it.
 
 
 ## Subject-specific albums
