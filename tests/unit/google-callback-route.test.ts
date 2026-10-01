@@ -17,6 +17,7 @@ import { GET } from "@/app/api/auth/google/callback/route";
 
 describe("GET /api/auth/google/callback", () => {
   beforeEach(() => {
+    vi.unstubAllEnvs();
     vi.clearAllMocks();
   });
 
@@ -89,6 +90,28 @@ describe("GET /api/auth/google/callback", () => {
       maxAge: 3600,
     });
     expect(response.cookies.get("google_oauth_state")?.value).toBe("");
+  });
+
+  it("uses the configured public origin instead of the container request origin", async () => {
+    vi.stubEnv(
+      "GOOGLE_REDIRECT_URI",
+      "https://one-pic-diary.example.run.app/api/auth/google/callback"
+    );
+    cookiesMock.mockResolvedValue({
+      get: vi.fn(() => ({ value: "match-state" })),
+    });
+    exchangeCodeForTokenMock.mockResolvedValue({
+      access_token: "test-access-token",
+      expires_in: 3600,
+    });
+
+    const response = await GET(
+      new Request("http://0.0.0.0:8080/api/auth/google/callback?code=abc&state=match-state")
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://one-pic-diary.example.run.app/connect-google-photos?auth=ok"
+    );
   });
 
 });
