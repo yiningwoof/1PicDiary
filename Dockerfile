@@ -25,8 +25,13 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=8080
 
-RUN groupadd --system --gid 1001 nodejs \
-    && useradd --system --uid 1001 --gid nodejs nextjs
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends fontconfig fonts-noto-cjk \
+    && fc-cache --force \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1001 nodejs \
+    && useradd --system --uid 1001 --gid nodejs nextjs \
+    && install --directory --owner=nextjs --group=nodejs /home/nextjs/.cache/fontconfig
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
