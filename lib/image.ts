@@ -8,10 +8,10 @@ export type TextPosition = "top" | "middle" | "bottom";
  * caller-supplied string is ever interpolated into the overlay SVG.
  */
 export const FONT_FAMILIES = {
-  sans: '"PingFang SC","Hiragino Sans GB","Heiti SC","Microsoft YaHei",Arial,sans-serif',
-  serif: '"Songti SC","STSong","SimSun","Noto Serif CJK SC",Georgia,serif',
-  rounded: '"Arial Rounded MT Bold","Quicksand","PingFang SC",Verdana,sans-serif',
-  mono: '"SFMono-Regular","Menlo","Courier New",monospace',
+  sans: '"Noto Sans CJK SC","PingFang SC","Hiragino Sans GB","Heiti SC","Microsoft YaHei",Arial,sans-serif',
+  serif: '"Noto Serif CJK SC","Songti SC","STSong","SimSun",Georgia,serif',
+  rounded: '"Noto Sans CJK SC","Arial Rounded MT Bold","Quicksand","PingFang SC",Verdana,sans-serif',
+  mono: '"Noto Sans Mono CJK SC","Noto Sans CJK SC","SFMono-Regular","Menlo","Courier New",monospace',
 } as const;
 
 export type FontFamilyKey = keyof typeof FONT_FAMILIES;
