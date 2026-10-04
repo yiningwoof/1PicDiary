@@ -1,8 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cookiesMock, exchangeCodeForTokenMock } = vi.hoisted(() => ({
+const { cookiesMock, exchangeCodeForTokenMock, getGoogleOwnerIdMock, createGoogleSessionMock, deleteGoogleSessionMock } = vi.hoisted(() => ({
   cookiesMock: vi.fn(),
   exchangeCodeForTokenMock: vi.fn(),
+  getGoogleOwnerIdMock: vi.fn(),
+  createGoogleSessionMock: vi.fn(),
+  deleteGoogleSessionMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -11,6 +14,14 @@ vi.mock("next/headers", () => ({
 
 vi.mock("@/lib/google-auth", () => ({
   exchangeCodeForToken: exchangeCodeForTokenMock,
+  getGoogleOwnerId: getGoogleOwnerIdMock,
+}));
+
+vi.mock("@/lib/google-session", () => ({
+  createGoogleSession: createGoogleSessionMock,
+  deleteGoogleSession: deleteGoogleSessionMock,
+  GOOGLE_SESSION_COOKIE: "google_session_id",
+  GOOGLE_SESSION_MAX_AGE_SECONDS: 7776000,
 }));
 
 import { GET } from "@/app/api/auth/google/callback/route";
@@ -19,6 +30,8 @@ describe("GET /api/auth/google/callback", () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
     vi.clearAllMocks();
+    getGoogleOwnerIdMock.mockResolvedValue("google-owner-1");
+    createGoogleSessionMock.mockResolvedValue({ id: "session-id", expires: new Date("2027-01-01T00:00:00Z") });
   });
 
   it("redirects with missing_code when code is absent", async () => {
@@ -75,6 +88,7 @@ describe("GET /api/auth/google/callback", () => {
     exchangeCodeForTokenMock.mockResolvedValue({
       access_token: "test-access-token",
       expires_in: 3600,
+      refresh_token: "test-refresh-token",
     });
     const response = await GET(
       new Request("http://localhost/api/auth/google/callback?code=abc&state=match-state")
@@ -83,11 +97,18 @@ describe("GET /api/auth/google/callback", () => {
       "http://localhost/connect-google-photos?auth=ok"
     );
     expect(exchangeCodeForTokenMock).toHaveBeenCalledWith("abc");
-    expect(response.cookies.get("google_access_token")).toMatchObject({
-      value: "test-access-token",
+    expect(getGoogleOwnerIdMock).toHaveBeenCalledWith("test-access-token");
+    expect(createGoogleSessionMock).toHaveBeenCalledWith({
+      ownerId: "google-owner-1",
+      accessToken: "test-access-token",
+      refreshToken: "test-refresh-token",
+      expiresIn: 3600,
+    });
+    expect(response.cookies.get("google_session_id")).toMatchObject({
+      value: "session-id",
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 3600,
+      maxAge: 7776000,
     });
     expect(response.cookies.get("google_oauth_state")?.value).toBe("");
   });
@@ -103,6 +124,7 @@ describe("GET /api/auth/google/callback", () => {
     exchangeCodeForTokenMock.mockResolvedValue({
       access_token: "test-access-token",
       expires_in: 3600,
+      refresh_token: "test-refresh-token",
     });
 
     const response = await GET(
@@ -112,6 +134,18 @@ describe("GET /api/auth/google/callback", () => {
     expect(response.headers.get("location")).toBe(
       "https://one-pic-diary.example.run.app/connect-google-photos?auth=ok"
     );
+  });
+
+  it("does not create a non-persistent session when Google omits the refresh token", async () => {
+    cookiesMock.mockResolvedValue({ get: vi.fn(() => ({ value: "match-state" })) });
+    exchangeCodeForTokenMock.mockResolvedValue({ access_token: "access", expires_in: 3600 });
+    const response = await GET(new Request(
+      "http://localhost/api/auth/google/callback?code=abc&state=match-state"
+    ));
+    expect(response.headers.get("location")).toBe(
+      "http://localhost/connect-google-photos?auth=token_error"
+    );
+    expect(createGoogleSessionMock).not.toHaveBeenCalled();
   });
 
 });

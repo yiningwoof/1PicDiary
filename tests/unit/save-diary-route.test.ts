@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { cookiesMock } = vi.hoisted(() => ({
-  cookiesMock: vi.fn(),
+const { getSubjectAccountMock } = vi.hoisted(() => ({
+  getSubjectAccountMock: vi.fn(),
 }));
 
-vi.mock("next/headers", () => ({
-  cookies: cookiesMock,
+vi.mock("@/lib/subject-account", async (original) => ({
+  ...await original<typeof import("@/lib/subject-account")>(),
+  getSubjectAccount: getSubjectAccountMock,
 }));
 
 import { POST } from "@/app/api/save-diary/route";
@@ -16,17 +17,17 @@ describe("POST /api/save-diary", () => {
   });
 
   it("returns 401 when google token cookie is missing", async () => {
-    cookiesMock.mockResolvedValue({ get: vi.fn(() => undefined) });
+    getSubjectAccountMock.mockRejectedValue(new (await import("@/lib/subject-account")).SubjectAccountError("Connect Google Photos", 401));
 
     const response = await POST(new Request("http://localhost/api/save-diary", { method: "POST" }));
     const payload = await response.json();
 
     expect(response.status).toBe(401);
-    expect(payload.error).toContain("Google OAuth required");
+    expect(payload.error).toContain("Connect Google Photos");
   });
 
   it("returns 400 when photo field is missing", async () => {
-    cookiesMock.mockResolvedValue({ get: vi.fn(() => ({ value: "token" })) });
+    getSubjectAccountMock.mockResolvedValue({ accessToken: "token", ownerId: "owner", supabase: {} });
 
     const formData = new FormData();
     formData.set("subjectName", "大宝");

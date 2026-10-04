@@ -67,7 +67,6 @@ describe('subject album routing', () => {
     const response = await save(request('00000000-0000-4000-8000-000000000001', date));
     expect(response.status).toBe(400);
     expect(mocks.upload).not.toHaveBeenCalled();
-    expect(mocks.account).not.toHaveBeenCalled();
   });
   it('returns the Google reference with a warning if the metadata write fails', async () => {
     const subject = { id: '00000000-0000-4000-8000-000000000001', name: 'A', diary_album_title: 'A diary', google_diary_album_id: 'album-a' };

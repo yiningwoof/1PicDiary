@@ -1,5 +1,4 @@
 import { parseTextLayout, LayoutValidationError } from '@/lib/text-layout';
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { uploadPhotoToGooglePhotos } from "@/lib/google-photos";
@@ -20,15 +19,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get("google_access_token")?.value;
-
-    if (!accessToken) {
-      return NextResponse.json(
-        { error: "Google OAuth required. Please connect Google first." },
-        { status: 401 }
-      );
-    }
+    const { accessToken, ownerId, supabase: profileDb } = await getSubjectAccount();
 
     const formData = await request.formData();
 
@@ -58,7 +49,6 @@ export async function POST(request: Request) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(subjectId)) {
       return NextResponse.json({ error: "Select a saved subject first." }, { status: 400 });
     }
-    const { ownerId, supabase: profileDb } = await getSubjectAccount();
     const { data: subject, error: subjectError } = await profileDb.from("subjects")
       .select("id,name,diary_album_title,google_diary_album_id,save_originals,google_originals_album_id")
       .eq("id", subjectId).eq("google_owner_id", ownerId).maybeSingle();
