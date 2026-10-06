@@ -1,7 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { exchangeCodeForToken } from "@/lib/google-auth";
+import { exchangeCodeForToken, getGoogleOwnerId } from "@/lib/google-auth";
+import { createGoogleSession, deleteGoogleSession, GOOGLE_SESSION_COOKIE, GOOGLE_SESSION_MAX_AGE_SECONDS } from "@/lib/google-session";
 
 function getPublicOrigin(requestUrl: URL) {
   const configuredRedirectUri = process.env.GOOGLE_REDIRECT_URI;
@@ -40,16 +41,27 @@ export async function GET(request: Request) {
 
   try {
     const token = await exchangeCodeForToken(code);
+    if (!token.refresh_token) throw new Error("Google did not return a refresh token");
+    const ownerId = await getGoogleOwnerId(token.access_token);
+    await deleteGoogleSession();
+    const session = await createGoogleSession({
+      ownerId,
+      accessToken: token.access_token,
+      refreshToken: token.refresh_token,
+      expiresIn: token.expires_in,
+    });
     const response = NextResponse.redirect(new URL("/connect-google-photos?auth=ok", publicOrigin));
 
-    response.cookies.set("google_access_token", token.access_token, {
+    response.cookies.set(GOOGLE_SESSION_COOKIE, session.id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: token.expires_in,
+      maxAge: GOOGLE_SESSION_MAX_AGE_SECONDS,
+      expires: session.expires,
       path: "/",
     });
 
+    response.cookies.delete("google_access_token");
     response.cookies.delete("google_oauth_state");
 
     return response;

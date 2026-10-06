@@ -23,6 +23,8 @@ A Next.js web application for creating one-photo diary entries:
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+GOOGLE_TOKEN_ENCRYPTION_KEY=
+APP_URL=
 
 SUPABASE_URL=
 SUPABASE_SECRET_KEY=
@@ -31,6 +33,11 @@ SUPABASE_SECRET_KEY=
 Keep these variables in `.env.local` for local development. They are read only
 by the Next.js server. Do not add `NEXT_PUBLIC_` to either Supabase variable,
 and never commit `.env.local`.
+
+Generate `GOOGLE_TOKEN_ENCRYPTION_KEY` once with `openssl rand -base64 32`.
+Keep the same value across deployments so existing sessions remain decryptable.
+Leave `APP_URL` empty locally. In Cloud Run, set it to the one public URL users
+should keep; requests on another Cloud Run hostname redirect to this URL.
 
 ## Run locally
 
@@ -61,8 +68,9 @@ docker run --rm --env-file .env.local -p 8080:8080 1picdiary
 
 Then visit `http://localhost:8080`. The local Google OAuth redirect URI must
 match that port when testing OAuth through the container. In Cloud Run, inject
-`GOOGLE_CLIENT_SECRET` and `SUPABASE_SECRET_KEY` from Secret Manager and set
-`GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`, and `SUPABASE_URL` as runtime
+`GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_ENCRYPTION_KEY`, and `SUPABASE_SECRET_KEY`
+from Secret Manager and set `APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`,
+and `SUPABASE_URL` as runtime
 configuration. Do not bake any of them into the image.
 
 ## Supabase schema
@@ -92,7 +100,10 @@ album names per Google account. Unfinished photo drafts stay separate per subjec
 while the page remains open; reloads do not retain those drafts. Subjects and album
 mappings are stored in the database and load after reconnecting on another device.
 If Google Photos accepts an album but the database write fails, retry with the same
-album name to reuse it. Account sign-in must be renewed when the access token expires.
+album name to reuse it. Google sessions are stored in `google_sessions`. The browser
+keeps only an HttpOnly session ID; access and refresh tokens are AES-256-GCM encrypted
+in Supabase. The server refreshes expired access tokens automatically. Sessions end
+after 90 days, when the user disconnects, or when Google revokes the refresh token.
 
 
 ## Diary dates and Google-only image storage

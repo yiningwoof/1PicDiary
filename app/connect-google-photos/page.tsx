@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { hasGoogleSession } from "@/lib/google-session";
 
 const AUTH_ERRORS: Record<string, string> = {
   cancelled: "Google connection was cancelled. Try again when you are ready and allow both Google Photos permissions.",
@@ -14,8 +14,7 @@ export default async function ConnectGooglePhotos({
   searchParams: Promise<{ auth?: string | string[] }>;
 }) {
   const { auth } = await searchParams;
-  const cookieStore = await cookies();
-  const connected = Boolean(cookieStore.get("google_access_token")?.value);
+  const connected = await hasGoogleSession();
   const error = typeof auth === "string" ? AUTH_ERRORS[auth] : undefined;
 
   return (
@@ -38,7 +37,7 @@ export default async function ConnectGooglePhotos({
         </p>
       ) : connected ? (
         <p role="status" className="rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-950">
-          Google sign-in is connected for this session. Add each subject and their album, then choose whose diary to create.
+          Google Photos is connected. This connection remains available until you disconnect it or Google revokes access.
         </p>
       ) : null}
 
@@ -58,9 +57,15 @@ export default async function ConnectGooglePhotos({
           <a href="/api/auth/google/start" className="inline-flex min-h-11 items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
             {connected ? "Reconnect Google Photos" : "Connect Google Photos"}
           </a>
+          {connected ? (
+            <form action="/api/auth/google/disconnect" method="post" className="inline-block pl-3">
+              <button type="submit" className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-medium">
+                Disconnect
+              </button>
+            </form>
+          ) : null}
           <p className="text-xs text-gray-500">
-            Previously connected? Reconnect once to grant the album permission.
-            If your session expires later, return here to connect again.
+            Reconnect only if you want to switch Google accounts or Google asks you to grant access again.
           </p>
         </li>
 
