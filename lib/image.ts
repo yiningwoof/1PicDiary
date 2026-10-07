@@ -249,7 +249,7 @@ export async function renderTextLayer(text: string, width: number, height: numbe
   const rendered = lines.map((line, index) => {
     const isDateLine = index === 0;
     const lineFontSize = isDateLine ? fontSize * 0.85 : fontSize;
-    const weight = isDateLine ? '500' : layout.fontWeight === 'bold' ? '800' : '400';
+    const weight = layout.fontWeight === 'bold' ? '800' : '400';
     const baseline = isDateLine
       ? padding + lineFontSize * 1.05
       : padding + fontSize * 0.85 * 1.4 + fontSize * 1.05 + (index - 1) * fontSize * 1.4;
