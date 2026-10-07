@@ -236,7 +236,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setPreviewUrl(null);
           }}
           maxLength={80}
-          placeholder='例如：今天和妹妹一起搭积木，笑得很开心。'
+          placeholder='For example: We built blocks together and laughed all afternoon.'
         />
 
         {photo && diaryText.trim() && (
@@ -272,14 +272,14 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         {previewUrl ? (
           <Image
             src={previewUrl}
-            alt='合成图预览'
+            alt='Composed diary preview'
             width={800}
             height={800}
             unoptimized
             className='max-h-96 w-auto rounded-md object-contain'
           />
         ) : (
-          <p className='text-sm text-gray-500'>尚未生成合成预览</p>
+          <p className='text-sm text-gray-500'>No composed preview yet</p>
         )}
       </div>
 
