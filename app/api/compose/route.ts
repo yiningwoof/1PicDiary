@@ -10,6 +10,7 @@ import {
   resolveTextColor,
   TextPosition,
 } from "@/lib/image";
+import { isDiaryDate } from '@/lib/diary-date';
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,7 @@ export async function POST(request: Request) {
     const textLayout = parseTextLayout(formData.get("textLayout"));
     const file = formData.get("photo");
     const subjectName = String(formData.get("subjectName") ?? "Subject");
+    const diaryDate = String(formData.get("diaryDate") ?? "").trim();
     const diaryText = String(formData.get("diaryText") ?? "").trim();
     const textPosition = String(formData.get("textPosition") ?? "bottom") as TextPosition;
 
@@ -29,6 +31,10 @@ export async function POST(request: Request) {
 
     if (!diaryText.trim()) {
       return NextResponse.json({ error: "diaryText is required" }, { status: 400 });
+    }
+
+    if (!isDiaryDate(diaryDate)) {
+      return NextResponse.json({ error: "Choose a valid diary date (YYYY-MM-DD)." }, { status: 400 });
     }
 
     if (!["top", "middle", "bottom"].includes(textPosition)) {
@@ -43,6 +49,7 @@ export async function POST(request: Request) {
     const composed = await composeDiaryImage({
       imageBuffer,
       subjectName,
+      diaryDate,
       diaryText,
       textPosition,
       textLayout,

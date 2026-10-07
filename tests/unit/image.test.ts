@@ -19,6 +19,7 @@ describe("composeDiaryImage", () => {
     const output = await composeDiaryImage({
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心",
       textPosition: "bottom",
     });
@@ -46,6 +47,7 @@ describe("composeDiaryImage", () => {
     const baseOptions = {
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -74,6 +76,7 @@ describe("composeDiaryImage", () => {
     const baseOptions = {
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -109,6 +112,7 @@ describe("composeDiaryImage", () => {
     const baseOptions = {
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -145,6 +149,7 @@ describe("composeDiaryImage", () => {
     const baseOptions = {
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心",
       textPosition: "bottom" as const,
     };
@@ -163,6 +168,13 @@ describe("composeDiaryImage", () => {
 });
 
 describe("wrapText", () => {
+  it("keeps explicit diary lines separate", () => {
+    expect(wrapText("9/1/2026\n今天很开心", 40, 2000)).toEqual([
+      "9/1/2026",
+      "今天很开心",
+    ]);
+  });
+
   it("keeps a short line intact", () => {
     expect(wrapText("大宝: 今天很开心", 40, 2000)).toEqual(["大宝: 今天很开心"]);
   });
@@ -212,6 +224,7 @@ describe("composeDiaryImage with long text", () => {
     const baseOptions = {
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       textPosition: "bottom" as const,
     };
 
@@ -247,6 +260,7 @@ describe("composeDiaryImage with long text", () => {
     const output = await composeDiaryImage({
       imageBuffer: input,
       subjectName: "大宝",
+      diaryDate: "2026-09-01",
       diaryText: "今天很开心".repeat(60),
       textPosition: "middle",
       fontScale: 2.5,

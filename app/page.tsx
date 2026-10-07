@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import { SubjectDiaries } from '@/components/subject-diaries';
 import { localDiaryDate, isDiaryDate } from '@/lib/diary-date';
@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 
 import { TextLayoutEditor } from '@/components/text-layout-editor';
 import type { TextLayout } from '@/lib/text-layout';
+import { diaryOverlayText } from '@/lib/diary-overlay-text';
 
 export default function Home() {
   return (
@@ -34,16 +35,20 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
   const [status, setStatus] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
+  const overlayText = useMemo(
+    () => isDiaryDate(diaryDate) ? diaryOverlayText(diaryDate, diaryText) : '',
+    [diaryDate, diaryText],
+  );
 
   const [layoutText, setLayoutText] = useState('');
   const onLayoutChange = useCallback(
     (next: TextLayout | null, ready: boolean) => {
-      setLayoutText(diaryText);
+      setLayoutText(overlayText);
       setLayout(next);
       setLayoutReady(ready);
       setPreviewUrl(null);
     },
-    [diaryText],
+    [overlayText],
   );
 
   useEffect(
@@ -61,7 +66,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       !diaryText.trim() ||
       !layout ||
       !layoutReady ||
-      layoutText !== diaryText
+      layoutText !== overlayText
     ) {
       setStatus(
         'Add a photo and diary line, then wait for the text layout to finish updating.',
@@ -76,6 +81,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       formData.set('photo', photo);
       formData.set('subjectName', subjectName);
       formData.set('diaryText', diaryText);
+      formData.set('diaryDate', diaryDate);
       formData.set('textLayout', JSON.stringify(layout));
       const response = await fetch('/api/compose', {
         method: 'POST',
@@ -112,7 +118,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       !diaryText.trim() ||
       !layout ||
       !layoutReady ||
-      layoutText !== diaryText
+      layoutText !== overlayText
     ) {
       setStatus(
         'Add a photo and diary line, then wait for the text layout to finish updating.',
@@ -193,7 +199,11 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           min='0001-01-01'
           max='9999-12-31'
           value={diaryDate}
-          onChange={(event) => setDiaryDate(event.target.value)}
+          onChange={(event) => {
+            setDiaryDate(event.target.value);
+            setLayoutReady(false);
+            setPreviewUrl(null);
+          }}
         />
         <p className='text-sm text-gray-600'>
           The day this memory happened, even if you are saving it later.
@@ -226,14 +236,14 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setPreviewUrl(null);
           }}
           maxLength={80}
-          placeholder='例如：今天和妹妹一起搭积木，笑得很开心。'
+          placeholder='For example: We built blocks together and laughed all afternoon.'
         />
 
         {photo && diaryText.trim() && (
           <TextLayoutEditor
             key={photoVersion}
             photo={photo}
-            text={`${subjectName}: ${diaryText.trim()}`}
+            text={overlayText}
             disabled={saving || previewing}
             onChange={onLayoutChange}
           />
@@ -243,14 +253,14 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             type='button'
             variant='outline'
             onClick={generatePreview}
-            disabled={!layoutReady || layoutText !== diaryText}
+            disabled={!layoutReady || layoutText !== overlayText}
           >
             {previewing ? 'Generating preview…' : 'Preview composed image'}
           </Button>
           <Button
             type='button'
             onClick={saveDiary}
-            disabled={saving || !layoutReady || layoutText !== diaryText}
+            disabled={saving || !layoutReady || layoutText !== overlayText}
           >
             {saving ? 'Saving...' : 'Save to Google Photos'}
           </Button>
@@ -262,14 +272,14 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         {previewUrl ? (
           <Image
             src={previewUrl}
-            alt='合成图预览'
+            alt='Composed diary preview'
             width={800}
             height={800}
             unoptimized
             className='max-h-96 w-auto rounded-md object-contain'
           />
         ) : (
-          <p className='text-sm text-gray-500'>尚未生成合成预览</p>
+          <p className='text-sm text-gray-500'>No composed preview yet</p>
         )}
       </div>
 

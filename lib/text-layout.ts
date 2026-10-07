@@ -10,7 +10,8 @@ export type TextLayout = {
   color: string;
   strokeColor: string;
   strokeWidth: number;
-  alignment: 'center';
+  alignment: 'left' | 'center';
+  fontWeight: 'normal' | 'bold';
   renderedText?: string;
   image?: { width: number; height: number };
 };
@@ -18,7 +19,7 @@ export type TextLayout = {
 export const DEFAULT_LAYOUT: TextLayout = {
   version: 1, source: 'manual', box: { x: 0.05, y: 0.72, width: 0.9, height: 0.15 },
   fontFamily: 'sans', fontSize: 0.045, color: '#ffffff', strokeColor: '#000000',
-  strokeWidth: 0, alignment: 'center',
+  strokeWidth: 0.0035, alignment: 'left', fontWeight: 'bold',
 };
 export const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
 
@@ -59,12 +60,15 @@ export function parseTextLayout(input: unknown): TextLayout | undefined {
       !['x', 'y', 'width', 'height'].every(k => numeric(box[k])) ||
       !numeric(obj.fontSize) || !numeric(obj.strokeWidth) ||
       !['sans', 'serif', 'rounded', 'mono'].includes(String(obj.fontFamily)) ||
-      !color(obj.color) || !color(obj.strokeColor) || obj.alignment !== 'center') {
+      !color(obj.color) || !color(obj.strokeColor) || !['left', 'center'].includes(String(obj.alignment)) ||
+      (obj.fontWeight != null && !['normal', 'bold'].includes(String(obj.fontWeight)))) {
     throw new LayoutValidationError('Invalid text layout. Please reset the text and try again.');
   }
   return boundLayout({ version: 1, source: obj.source as TextLayout['source'],
     box: { x: box.x as number, y: box.y as number, width: box.width as number, height: box.height as number },
     fontFamily: obj.fontFamily as LayoutFont, fontSize: clamp(obj.fontSize, 0.001, 0.16),
-    color: obj.color, strokeColor: obj.strokeColor, strokeWidth: clamp(obj.strokeWidth, 0, 0.02), alignment: 'center',
+    color: obj.color, strokeColor: obj.strokeColor, strokeWidth: clamp(obj.strokeWidth, 0, 0.02),
+    alignment: obj.alignment as TextLayout['alignment'],
+    fontWeight: (obj.fontWeight ?? 'normal') as TextLayout['fontWeight'],
   });
 }

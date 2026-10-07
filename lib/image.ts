@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { DEFAULT_LAYOUT, boundLayout, clamp, type TextLayout } from "@/lib/text-layout";
+import { diaryOverlayText } from "@/lib/diary-overlay-text";
 
 export type TextPosition = "top" | "middle" | "bottom";
 
@@ -71,6 +72,7 @@ export function resolveFontScale(value: unknown): number {
 export type ComposeDiaryImageInput = {
   imageBuffer: Buffer;
   subjectName: string;
+  diaryDate: string;
   diaryText: string;
   textPosition: TextPosition;
   textLayout?: TextLayout;
@@ -169,6 +171,14 @@ export function wrapText(
   fontSize: number,
   maxWidth: number,
 ): string[] {
+  return text.split(/\r?\n/).flatMap((line) => wrapTextLine(line, fontSize, maxWidth));
+}
+
+function wrapTextLine(
+  text: string,
+  fontSize: number,
+  maxWidth: number,
+): string[] {
   const lines: string[] = [];
   let current = "";
 
@@ -233,11 +243,15 @@ export async function renderTextLayer(text: string, width: number, height: numbe
     fontSize: fontSize / width, image: { width, height }, renderedText: text,
   };
   const font = resolveFontFamily(layout.fontFamily);
+  const textX = layout.alignment === 'left' ? padding : pixelWidth / 2;
+  const anchor = layout.alignment === 'left' ? 'start' : 'middle';
   const stroke = outline > 0 ? ` stroke="${layout.strokeColor}" stroke-width="${outline}" stroke-linejoin="round" paint-order="stroke fill"` : '';
   const rendered = lines.map((line, index) => {
+    const lineFontSize = fontSize;
+    const weight = layout.fontWeight === 'bold' ? '800' : '400';
     const baseline = padding + fontSize * 1.05 + index * fontSize * 1.4;
-    const shadow = outline > 0 ? '' : `<text x="50%" y="${baseline + Math.max(1, fontSize * 0.06)}" text-anchor="middle" fill="rgba(0,0,0,0.55)" font-size="${fontSize}" font-family='${font}'>${escapeXml(line)}</text>`;
-    return `${shadow}<text x="50%" y="${baseline}" text-anchor="middle" fill="${layout.color}" font-size="${fontSize}" font-family='${font}'${stroke}>${escapeXml(line)}</text>`;
+    const shadow = outline > 0 ? '' : `<text x="${textX}" y="${baseline + Math.max(1, lineFontSize * 0.06)}" text-anchor="${anchor}" fill="rgba(0,0,0,0.55)" font-size="${lineFontSize}" font-weight="${weight}" font-family='${font}'>${escapeXml(line)}</text>`;
+    return `${shadow}<text x="${textX}" y="${baseline}" text-anchor="${anchor}" fill="${layout.color}" font-size="${lineFontSize}" font-weight="${weight}" font-family='${font}'${stroke}>${escapeXml(line)}</text>`;
   }).join('');
   const svg = `<svg width="${pixelWidth}" height="${pixelHeight}" xmlns="http://www.w3.org/2000/svg">${rendered}</svg>`;
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
@@ -247,7 +261,12 @@ export async function renderTextLayer(text: string, width: number, height: numbe
 export async function composeDiaryImageWithLayout(input: ComposeDiaryImageInput) {
   const { data, info } = await orientedPhoto(input.imageBuffer);
   const layout = input.textLayout ?? layoutFromLegacy(input, info.width);
-  const { png, textLayout } = await renderTextLayer(`${input.subjectName}: ${input.diaryText}`.trim(), info.width, info.height, layout);
+  const { png, textLayout } = await renderTextLayer(
+    diaryOverlayText(input.diaryDate, input.diaryText),
+    info.width,
+    info.height,
+    layout,
+  );
   const imageBuffer = await sharp(data).composite([{ input: png,
     left: Math.round(textLayout.box.x * info.width), top: Math.round(textLayout.box.y * info.height),
   }]).png().toBuffer();

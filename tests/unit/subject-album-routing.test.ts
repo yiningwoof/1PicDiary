@@ -53,7 +53,7 @@ describe('subject album routing', () => {
     expect(response.status).toBe(200);
     expect(db.query.eq).toHaveBeenCalledWith('id', subject.id);
     expect(db.query.eq).toHaveBeenCalledWith('google_owner_id', 'owner');
-    expect(mocks.compose).toHaveBeenCalledWith(expect.objectContaining({ subjectName: subject.name }));
+    expect(mocks.compose).toHaveBeenCalledWith(expect.objectContaining({ subjectName: subject.name, diaryDate: '2026-09-01' }));
     expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ albumId: subject.google_diary_album_id }));
     expect(mocks.getAlbum).not.toHaveBeenCalled();
     expect(db.query.insert).toHaveBeenCalledWith({
