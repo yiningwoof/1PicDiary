@@ -16,6 +16,7 @@ function rasterKey(text: string, photo: PhotoPreview | null, layout: TextLayout)
 }
 const center = (points: Point[]): Point => points.length > 1
   ? { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 } : points[0];
+const percent = (value: number, digits = 1) => `${(value * 100).toFixed(digits)}%`;
 
 export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   photo: File; text: string; disabled: boolean;
@@ -177,10 +178,12 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
           {(['Top', 'Middle', 'Bottom'] as const).map((position) => <Button key={position} type='button' variant='outline' onClick={() => update({ ...layout, box: { ...layout.box, x: (1 - layout.box.width) / 2, y: position === 'Top' ? 0.05 : position === 'Middle' ? (1 - layout.box.height) / 2 : 0.95 - layout.box.height } })}>{position}</Button>)}
           <Button type='button' variant='outline' onClick={() => update({ ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box } })}>Reset layout</Button>
         </div>
-        <label className='grid gap-1 text-sm'>Text size
+        <label className='grid gap-1 text-sm'>
+          <span className='flex items-center justify-between gap-3'><span>Text size</span><output className='font-mono text-xs text-gray-600'>{percent(layout.fontSize)}</output></span>
           <input aria-label='Text size' type='range' min={0.008} max={0.16} step={0.001} value={layout.fontSize} onChange={event => update({ ...layout, fontSize: Number(event.target.value) })} />
         </label>
-        <label className='grid gap-1 text-sm'>Textbox width
+        <label className='grid gap-1 text-sm'>
+          <span className='flex items-center justify-between gap-3'><span>Textbox width</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.width, 0)}</output></span>
           <input aria-label='Textbox width' type='range' min={0.15} max={0.96} step={0.01} value={layout.box.width} onChange={event => update({ ...layout, box: { ...layout.box, width: Number(event.target.value) } })} />
         </label>
         <details>
@@ -191,11 +194,11 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
                 <option value='sans'>Sans</option><option value='serif'>Serif</option><option value='rounded'>Rounded</option><option value='mono'>Monospace</option>
               </select>
             </label>
-            <label className='flex items-center justify-between text-sm'>Text color<input type='color' value={layout.color} onChange={event => update({ ...layout, color: event.target.value })} /></label>
-            <label className='grid gap-1 text-sm'>Outline width<input type='range' min={0} max={0.012} step={0.0005} value={layout.strokeWidth} onChange={event => update({ ...layout, strokeWidth: Number(event.target.value) })} /></label>
-            <label className='flex items-center justify-between text-sm'>Outline color<input type='color' value={layout.strokeColor} disabled={layout.strokeWidth === 0} onChange={event => update({ ...layout, strokeColor: event.target.value })} /></label>
-            <label className='grid gap-1 text-sm'>Horizontal position<input type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.width)} step={0.001} value={layout.box.x} onChange={event => update({ ...layout, box: { ...layout.box, x: Number(event.target.value) } })} /></label>
-            <label className='grid gap-1 text-sm'>Vertical position<input type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.height)} step={0.001} value={layout.box.y} onChange={event => update({ ...layout, box: { ...layout.box, y: Number(event.target.value) } })} /></label>
+            <label className='flex items-center justify-between gap-3 text-sm'><span>Text color</span><span className='flex items-center gap-2'><output className='font-mono text-xs text-gray-600'>{layout.color.toUpperCase()}</output><input aria-label='Text color' type='color' value={layout.color} onChange={event => update({ ...layout, color: event.target.value })} /></span></label>
+            <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Outline width</span><output className='font-mono text-xs text-gray-600'>{percent(layout.strokeWidth, 2)}</output></span><input aria-label='Outline width' type='range' min={0} max={0.012} step={0.0005} value={layout.strokeWidth} onChange={event => update({ ...layout, strokeWidth: Number(event.target.value) })} /></label>
+            <label className='flex items-center justify-between gap-3 text-sm'><span>Outline color</span><span className='flex items-center gap-2'><output className='font-mono text-xs text-gray-600'>{layout.strokeColor.toUpperCase()}</output><input aria-label='Outline color' type='color' value={layout.strokeColor} disabled={layout.strokeWidth === 0} onChange={event => update({ ...layout, strokeColor: event.target.value })} /></span></label>
+            <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Horizontal position</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.x)}</output></span><input aria-label='Horizontal position' type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.width)} step={0.001} value={layout.box.x} onChange={event => update({ ...layout, box: { ...layout.box, x: Number(event.target.value) } })} /></label>
+            <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Vertical position</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.y)}</output></span><input aria-label='Vertical position' type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.height)} step={0.001} value={layout.box.y} onChange={event => update({ ...layout, box: { ...layout.box, y: Number(event.target.value) } })} /></label>
             <p className='text-sm text-gray-600'>Keyboard: focus the text, use arrow keys to move it, and + or − to resize it. Hold Shift for larger moves.</p>
           </div>
         </details>
