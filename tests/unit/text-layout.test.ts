@@ -4,6 +4,13 @@ import { DEFAULT_LAYOUT, boundLayout, parseTextLayout, scaleLayout } from '@/lib
 import { composeDiaryImageWithLayout, orientedPhoto, renderTextLayer } from '@/lib/image';
 
 describe('text layout', () => {
+  it('defaults to bold, outlined, left-aligned text', () => {
+    expect(DEFAULT_LAYOUT).toMatchObject({
+      fontFamily: 'sans', fontWeight: 'bold', alignment: 'left',
+      color: '#ffffff', strokeColor: '#000000',
+    });
+    expect(DEFAULT_LAYOUT.strokeWidth).toBeGreaterThan(0);
+  });
   it('keeps a dragged box within the image', () => {
     const layout = boundLayout({ ...DEFAULT_LAYOUT, box: { x: -2, y: 3, width: .4, height: .2 } });
     expect(layout.box.x).toBe(.02);
@@ -34,8 +41,8 @@ describe('text layout', () => {
   });
   it('exports the exact preview layer at the resolved coordinates', async () => {
     const image = await sharp({ create: { width: 700, height: 900, channels: 3, background: '#336699' } }).png().toBuffer();
-    const layer = await renderTextLayer('A: A lovely day', 700, 900, DEFAULT_LAYOUT);
-    const result = await composeDiaryImageWithLayout({ imageBuffer: image, subjectName: 'A', diaryText: 'A lovely day', textPosition: 'bottom', textLayout: layer.textLayout });
+    const layer = await renderTextLayer('9/1/2026\nA lovely day', 700, 900, DEFAULT_LAYOUT);
+    const result = await composeDiaryImageWithLayout({ imageBuffer: image, subjectName: 'A', diaryDate: '2026-09-01', diaryText: 'A lovely day', textPosition: 'bottom', textLayout: layer.textLayout });
     const expected = await sharp(image).composite([{ input: layer.png, left: Math.round(layer.textLayout.box.x * 700), top: Math.round(layer.textLayout.box.y * 900) }]).png().toBuffer();
     expect(result.imageBuffer.equals(expected)).toBe(true);
     expect(result.textLayout).toEqual(layer.textLayout);

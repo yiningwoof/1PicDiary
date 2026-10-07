@@ -11,7 +11,8 @@ type Gesture = { layout: TextLayout; points: Point[]; width: boolean };
 function rasterKey(text: string, photo: PhotoPreview | null, layout: TextLayout) {
   // Moving a layer never requires another text-render request.
   return JSON.stringify([text, photo?.width, photo?.height, layout.box.width,
-    layout.fontFamily, layout.fontSize, layout.color, layout.strokeColor, layout.strokeWidth]);
+    layout.fontFamily, layout.fontSize, layout.color, layout.strokeColor, layout.strokeWidth,
+    layout.alignment, layout.fontWeight]);
 }
 const center = (points: Point[]): Point => points.length > 1
   ? { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 } : points[0];
