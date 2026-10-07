@@ -245,12 +245,16 @@ export async function renderTextLayer(text: string, width: number, height: numbe
   const font = resolveFontFamily(layout.fontFamily);
   const textX = layout.alignment === 'left' ? padding : pixelWidth / 2;
   const anchor = layout.alignment === 'left' ? 'start' : 'middle';
-  const weight = layout.fontWeight === 'bold' ? '700' : '400';
   const stroke = outline > 0 ? ` stroke="${layout.strokeColor}" stroke-width="${outline}" stroke-linejoin="round" paint-order="stroke fill"` : '';
   const rendered = lines.map((line, index) => {
-    const baseline = padding + fontSize * 1.05 + index * fontSize * 1.4;
-    const shadow = outline > 0 ? '' : `<text x="${textX}" y="${baseline + Math.max(1, fontSize * 0.06)}" text-anchor="${anchor}" fill="rgba(0,0,0,0.55)" font-size="${fontSize}" font-weight="${weight}" font-family='${font}'>${escapeXml(line)}</text>`;
-    return `${shadow}<text x="${textX}" y="${baseline}" text-anchor="${anchor}" fill="${layout.color}" font-size="${fontSize}" font-weight="${weight}" font-family='${font}'${stroke}>${escapeXml(line)}</text>`;
+    const isDateLine = index === 0;
+    const lineFontSize = isDateLine ? fontSize * 0.85 : fontSize;
+    const weight = isDateLine ? '500' : layout.fontWeight === 'bold' ? '800' : '400';
+    const baseline = isDateLine
+      ? padding + lineFontSize * 1.05
+      : padding + fontSize * 0.85 * 1.4 + fontSize * 1.05 + (index - 1) * fontSize * 1.4;
+    const shadow = outline > 0 ? '' : `<text x="${textX}" y="${baseline + Math.max(1, lineFontSize * 0.06)}" text-anchor="${anchor}" fill="rgba(0,0,0,0.55)" font-size="${lineFontSize}" font-weight="${weight}" font-family='${font}'>${escapeXml(line)}</text>`;
+    return `${shadow}<text x="${textX}" y="${baseline}" text-anchor="${anchor}" fill="${layout.color}" font-size="${lineFontSize}" font-weight="${weight}" font-family='${font}'${stroke}>${escapeXml(line)}</text>`;
   }).join('');
   const svg = `<svg width="${pixelWidth}" height="${pixelHeight}" xmlns="http://www.w3.org/2000/svg">${rendered}</svg>`;
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
