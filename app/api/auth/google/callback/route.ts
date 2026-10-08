@@ -19,6 +19,18 @@ function getPublicOrigin(requestUrl: URL) {
   return requestUrl.origin;
 }
 
+function getAuthErrorCode(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+
+  if (message.startsWith("Token exchange failed:")) return "token_exchange_error";
+  if (message === "Google did not return a refresh token") return "missing_refresh_token";
+  if (message.startsWith("Google identity")) return "identity_error";
+  if (message.includes("GOOGLE_TOKEN_ENCRYPTION_KEY")) return "encryption_error";
+  if (message.includes("google_sessions")) return "session_storage_error";
+
+  return "token_error";
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const publicOrigin = getPublicOrigin(url);
@@ -65,7 +77,12 @@ export async function GET(request: Request) {
     response.cookies.delete("google_oauth_state");
 
     return response;
-  } catch {
-    return NextResponse.redirect(new URL("/connect-google-photos?auth=token_error", publicOrigin));
+  } catch (error) {
+    console.error(
+      "Google OAuth callback failed:",
+      error instanceof Error ? error.message : "Unknown error",
+    );
+    const authError = getAuthErrorCode(error);
+    return NextResponse.redirect(new URL(`/connect-google-photos?auth=${authError}`, publicOrigin));
   }
 }
