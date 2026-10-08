@@ -2,6 +2,7 @@ import { parseTextLayout, LayoutValidationError } from '@/lib/text-layout';
 import { NextResponse } from "next/server";
 
 import { uploadPhotoToGooglePhotos } from "@/lib/google-photos";
+import { addDiaryDateMetadata } from "@/lib/google-photo-metadata";
 import {
   composeDiaryImageWithLayout,
   isFontFamilyKey,
@@ -80,11 +81,14 @@ export async function POST(request: Request) {
     });
 
     const albumId = subject.google_diary_album_id;
+    const datedDiaryImage = await addDiaryDateMetadata(composed.imageBuffer, diaryDate);
     const mediaItemId = await uploadPhotoToGooglePhotos({
       accessToken,
       albumId,
-      fileName: `${safeSubjectName}-${Date.now()}.png`,
-      imageBuffer: composed.imageBuffer,
+      fileName: `${safeSubjectName}-${diaryDate}-${Date.now()}.jpg`,
+      imageBuffer: datedDiaryImage,
+      mimeType: "image/jpeg",
+      description: diaryText,
     });
 
     const warnings: string[] = [];
@@ -97,6 +101,7 @@ export async function POST(request: Request) {
           fileName: file.name,
           imageBuffer,
           mimeType: file.type || "application/octet-stream",
+          description: diaryText,
         });
       } catch {
         warnings.push("The diary image was saved, but the original photo upload could not be confirmed. Check the originals album before retrying; do not re-upload the whole diary just to retry the original.");

@@ -143,7 +143,7 @@ describe("GET /api/auth/google/callback", () => {
       "http://localhost/api/auth/google/callback?code=abc&state=match-state"
     ));
     expect(response.headers.get("location")).toBe(
-      "http://localhost/connect-google-photos?auth=token_error"
+      "http://localhost/connect-google-photos?auth=missing_refresh_token"
     );
     expect(createGoogleSessionMock).not.toHaveBeenCalled();
   });

@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   account: vi.fn(), upload: vi.fn(), compose: vi.fn(), cookies: vi.fn(),
-  getAlbum: vi.fn(),
+  getAlbum: vi.fn(), metadata: vi.fn(),
 }));
 vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
 vi.mock('@/lib/subject-account', async (original) => ({
   ...await original<typeof import('@/lib/subject-account')>(), getSubjectAccount: mocks.account,
 }));
 vi.mock('@/lib/google-photos', () => ({ uploadPhotoToGooglePhotos: mocks.upload, getOrCreateAlbum: mocks.getAlbum }));
+vi.mock('@/lib/google-photo-metadata', () => ({ addDiaryDateMetadata: mocks.metadata }));
 vi.mock('@/lib/image', async (original) => ({
   ...await original<typeof import('@/lib/image')>(), composeDiaryImageWithLayout: mocks.compose,
 }));
@@ -37,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.cookies.mockResolvedValue({ get: () => ({ value: 'token' }) });
   mocks.compose.mockResolvedValue({ imageBuffer: Buffer.from('composed'), textLayout: DEFAULT_LAYOUT });
+  mocks.metadata.mockResolvedValue(Buffer.from('dated-diary-image'));
   mocks.upload.mockResolvedValue('media-id');
 });
 
@@ -54,7 +56,11 @@ describe('subject album routing', () => {
     expect(db.query.eq).toHaveBeenCalledWith('id', subject.id);
     expect(db.query.eq).toHaveBeenCalledWith('google_owner_id', 'owner');
     expect(mocks.compose).toHaveBeenCalledWith(expect.objectContaining({ subjectName: subject.name, diaryDate: '2026-09-01' }));
-    expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ albumId: subject.google_diary_album_id }));
+    expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({
+      albumId: subject.google_diary_album_id,
+      description: 'A good day',
+      mimeType: 'image/jpeg',
+    }));
     expect(mocks.getAlbum).not.toHaveBeenCalled();
     expect(db.query.insert).toHaveBeenCalledWith({
       subject_id: subject.id,
@@ -120,7 +126,7 @@ describe('subject album routing', () => {
     mocks.upload.mockResolvedValueOnce('diary-media').mockResolvedValueOnce('original-media');
     const response = await save(request(subject.id));
     expect(response.status).toBe(200);
-    expect(mocks.upload).toHaveBeenNthCalledWith(2, expect.objectContaining({ albumId: 'original-album', imageBuffer: Buffer.from('image'), mimeType: 'image/png', fileName: 'photo.png' }));
+    expect(mocks.upload).toHaveBeenNthCalledWith(2, expect.objectContaining({ albumId: 'original-album', imageBuffer: Buffer.from('image'), mimeType: 'image/png', fileName: 'photo.png', description: 'A good day' }));
     expect(db.query.insert).toHaveBeenCalledWith(expect.objectContaining({ google_media_item_id: 'diary-media', google_original_media_item_id: 'original-media' }));
   });
   it('keeps the diary reference and warns if the original upload fails', async () => {
