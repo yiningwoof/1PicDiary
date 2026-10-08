@@ -6,6 +6,11 @@ const AUTH_ERRORS: Record<string, string> = {
   missing_code: "Google did not finish connecting. Please try again.",
   state_error: "This connection attempt expired or could not be verified. Please start again from this page.",
   token_error: "We could not complete your Google connection. Please try again.",
+  token_exchange_error: "Google rejected the authorization code. Please start a new connection attempt.",
+  missing_refresh_token: "Google did not provide long-term access. Please connect again and approve the requested access.",
+  identity_error: "Google connected, but we could not identify the account. Please try again.",
+  encryption_error: "The server could not secure your Google session. Check the token encryption key configuration.",
+  session_storage_error: "Google connected, but the session could not be saved. Check the google_sessions table and permissions.",
 };
 
 export default async function ConnectGooglePhotos({
