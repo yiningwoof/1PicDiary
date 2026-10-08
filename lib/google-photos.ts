@@ -66,13 +66,20 @@ export async function uploadPhotoToGooglePhotos({
   fileName,
   imageBuffer,
   mimeType = "image/png",
+  description,
 }: {
   accessToken: string;
   albumId: string;
   fileName: string;
   imageBuffer: Buffer;
   mimeType?: string;
+  description?: string;
 }) {
+  const normalizedDescription = description?.trim();
+  if (normalizedDescription && normalizedDescription.length >= 1000) {
+    throw new Error("Google Photos descriptions must be shorter than 1000 characters");
+  }
+
   const uploadResponse = await fetch("https://photoslibrary.googleapis.com/v1/uploads", {
     method: "POST",
     headers: {
@@ -99,6 +106,7 @@ export async function uploadPhotoToGooglePhotos({
       albumId,
       newMediaItems: [
         {
+          ...(normalizedDescription ? { description: normalizedDescription } : {}),
           simpleMediaItem: { uploadToken, fileName },
         },
       ],
