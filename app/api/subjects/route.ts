@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { subjectAccountError, SubjectAccountError, getSubjectAccount } from "@/lib/subject-account";
 import { albumNames } from "@/lib/album-names";
 import { getOrCreateAlbum } from "@/lib/google-photos";
+import { hasTrustedRequestOrigin } from "@/lib/request-origin";
 
 export async function GET() {
   try {
@@ -16,8 +17,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin) {
+    if (!hasTrustedRequestOrigin(request)) {
       throw new SubjectAccountError("Please add subjects from 1PicDiary.", 403);
     }
     const { accessToken, ownerId, supabase } = await getSubjectAccount();
