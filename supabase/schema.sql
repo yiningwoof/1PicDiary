@@ -25,7 +25,7 @@ create unique index if not exists subjects_owner_diary_album_title
 
 create table if not exists public.diaries (
   id bigint generated always as identity primary key,
-  subject_id uuid not null references public.subjects(id) on delete restrict,
+  subject_id uuid not null references public.subjects(id) on delete cascade,
   diary_date date not null,
   diary_text text not null,
   text_layout jsonb not null check (jsonb_typeof(text_layout) = 'object' and text_layout ? 'version' and text_layout->>'version' = '1'),

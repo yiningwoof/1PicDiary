@@ -171,9 +171,10 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
   }
 
   return (
-    <div className='grid gap-4'>
-      <div className='rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-950'>
-        <h2 className='text-lg font-semibold'>
+    <div className='grid gap-5'>
+      <div className='rounded-3xl border border-cyan-200 bg-gradient-to-r from-cyan-50 via-white to-violet-50 p-5 text-slate-900 shadow-lg shadow-cyan-100/50'>
+        <p className='mb-1 text-sm font-bold uppercase tracking-wider text-cyan-700'>Step 2</p>
+        <h2 className='text-2xl font-bold'>
           2. Create a diary entry for {subjectName}
         </h2>
         <p className='mt-1 break-words text-sm'>
@@ -187,7 +188,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       </div>
       <fieldset
         disabled={saving || previewing}
-        className='grid min-w-0 gap-3 rounded-lg border border-gray-200 p-4'
+        className='grid min-w-0 gap-3 rounded-3xl border border-white/80 bg-white/85 p-5 shadow-lg shadow-violet-100/50 backdrop-blur sm:p-7'
       >
         <label htmlFor={`${subject.id}-date`} className='text-sm font-medium'>
           Diary date
@@ -205,7 +206,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setPreviewUrl(null);
           }}
         />
-        <p className='text-sm text-gray-600'>
+        <p className='text-sm text-slate-600'>
           The day this memory happened, even if you are saving it later.
         </p>
         <label htmlFor={`${subject.id}-photo`} className='text-sm font-medium'>
@@ -267,8 +268,8 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         </div>
       </fieldset>
 
-      <div className='grid gap-3 rounded-lg border border-gray-200 p-4'>
-        <h2 className='text-sm font-medium'>Preview</h2>
+      <div className='grid gap-3 rounded-3xl border border-fuchsia-100 bg-gradient-to-br from-white to-fuchsia-50/70 p-5 shadow-lg shadow-fuchsia-100/40'>
+        <h2 className='text-lg font-bold text-fuchsia-900'>Preview</h2>
         {previewUrl ? (
           <Image
             src={previewUrl}
@@ -276,15 +277,15 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             width={800}
             height={800}
             unoptimized
-            className='max-h-96 w-auto rounded-md object-contain'
+            className='max-h-96 w-auto rounded-2xl object-contain shadow-md'
           />
         ) : (
-          <p className='text-sm text-gray-500'>No composed preview yet</p>
+          <p className='rounded-2xl border border-dashed border-fuchsia-200 bg-white/60 p-8 text-center text-sm text-slate-500'>No composed preview yet</p>
         )}
       </div>
 
       {status ? (
-        <p role='status' className='text-sm text-gray-700'>
+        <p role='status' className='rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm font-medium text-violet-950'>
           {status}
         </p>
       ) : null}
