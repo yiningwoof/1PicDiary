@@ -149,11 +149,11 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   }
 
   return (
-    <section className='grid min-w-0 gap-3' aria-label='Text layout editor'>
-      <h3 className='font-semibold'>Position your text</h3>
-      <p id={`${id}-help`} className='text-sm text-gray-600'>Drag the text to move it. Pinch with two fingers to resize it, or drag the right handle to change line wrapping. You can scroll outside the photo.</p>
+    <section className='grid min-w-0 gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-violet-50/70 p-4' aria-label='Text layout editor'>
+      <h3 className='text-lg font-bold text-violet-950'>Position your text</h3>
+      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag the text to move it. Pinch with two fingers to resize it, or drag the right handle to change line wrapping. You can scroll outside the photo.</p>
       {source ? (
-        <div ref={frame} className='relative mx-auto w-full max-w-xl select-none overflow-hidden rounded-md bg-gray-200'
+        <div ref={frame} className='relative mx-auto w-full max-w-xl select-none overflow-hidden rounded-2xl bg-slate-200 shadow-lg'
           style={{ aspectRatio: `${source.width} / ${source.height}`, touchAction: 'none' }}
           onPointerDown={down} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onLostPointerCapture={end}>
           {/* The server normalizes photo orientation; this preview is never uploaded to Google. */}
@@ -162,11 +162,11 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
           {layer && (
             <div data-text-box role='button' tabIndex={disabled ? -1 : 0} aria-label='Move and resize diary text' aria-describedby={`${id}-help`} aria-disabled={disabled}
               onKeyDown={keyboard}
-              className='absolute cursor-move outline outline-2 outline-blue-500 focus-visible:outline-4'
+              className='absolute cursor-move outline outline-2 outline-fuchsia-500 focus-visible:outline-4'
               style={{ left: `${layout.box.x * 100}%`, top: `${layout.box.y * 100}%`, width: `${layout.box.width * 100}%`, height: `${layout.box.height * 100}%` }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={layer.url} alt='' className='pointer-events-none h-full w-full' draggable={false} onLoad={() => setLayerLoaded(layer.url)} />
-              <span data-width-handle aria-hidden='true' className='absolute -right-3 top-1/2 flex h-12 w-6 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded bg-blue-600 text-white'>↔</span>
+              <span data-width-handle aria-hidden='true' className='absolute -right-3 top-1/2 flex h-12 w-6 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-fuchsia-600 text-white shadow-md'>↔</span>
             </div>
           )}
         </div>
