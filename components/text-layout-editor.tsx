@@ -4,7 +4,9 @@ import { useEffect, useId, useRef, useState, type PointerEvent, type KeyboardEve
 import { Button } from '@/components/ui/button';
 import { DEFAULT_LAYOUT, boundLayout, clamp, scaleLayout, type Point, type TextLayout } from '@/lib/text-layout';
 
-type PhotoPreview = { url: string; width: number; height: number };
+type FileDetails = { fileName?: string; extension?: string; reportedMimeType?: string; detectedFormat?: string; reason?: string };
+type ConversionDetails = FileDetails & { editingFormat: string; decoder: string };
+type PhotoPreview = { url: string; width: number; height: number; conversion: ConversionDetails };
 type Layer = { url: string; key: string };
 type Gesture = { layout: TextLayout; points: Point[]; width: boolean };
 
@@ -17,6 +19,11 @@ function rasterKey(text: string, photo: PhotoPreview | null, layout: TextLayout)
 const center = (points: Point[]): Point => points.length > 1
   ? { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2 } : points[0];
 const percent = (value: number, digits = 1) => `${(value * 100).toFixed(digits)}%`;
+function browserFormat(file: File) {
+  const mime = file.type.split('/')[1];
+  const extension = file.name.includes('.') ? file.name.split('.').pop() : '';
+  return (mime || extension || 'unknown format').toUpperCase();
+}
 
 export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   photo: File; text: string; disabled: boolean;
@@ -27,6 +34,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   const [layout, setLayout] = useState<TextLayout>(DEFAULT_LAYOUT);
   const [layer, setLayer] = useState<Layer | null>(null);
   const [error, setError] = useState('');
+  const [diagnostic, setDiagnostic] = useState<FileDetails | null>(null);
+  const [photoStatus, setPhotoStatus] = useState('Inspecting photo…');
   const [retry, setRetry] = useState(0);
   const [gesturing, setGesturing] = useState(false);
   const [sourceLoaded, setSourceLoaded] = useState(false);
@@ -49,13 +58,27 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
     const form = new FormData();
     form.set('photo', photo);
     async function prepare() {
+      setSource(null);
+      setDiagnostic(null);
+      setError('');
+      setPhotoStatus(`Browser reports ${browserFormat(photo)}. Inspecting file contents and preparing a PNG editing copy…`);
       try {
         const response = await fetch('/api/editor-photo', { method: 'POST', body: form, signal: controller.signal });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error ?? 'Could not open this image.');
-        if (!controller.signal.aborted) { setSource(result); setError(''); }
+        if (!response.ok) {
+          if (!controller.signal.aborted) setDiagnostic(result.details ?? null);
+          throw new Error(result.error ?? 'Could not open this image.');
+        }
+        if (!controller.signal.aborted) {
+          setSource(result);
+          setPhotoStatus(`Verified ${result.conversion.detectedFormat} → ${result.conversion.editingFormat} editing copy (${result.width}×${result.height}).`);
+          setError('');
+        }
       } catch (err) {
-        if (!controller.signal.aborted) setError(err instanceof Error ? err.message : 'Could not open this image.');
+        if (!controller.signal.aborted) {
+          setPhotoStatus('Photo inspection or conversion failed. See the detected file details below.');
+          setError(err instanceof Error ? err.message : 'Could not open this image.');
+        }
       }
     }
     void prepare();
@@ -152,6 +175,17 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
     <section className='grid min-w-0 gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-violet-50/70 p-4' aria-label='Text layout editor'>
       <h3 className='text-lg font-bold text-violet-950'>Position your text</h3>
       <p id={`${id}-help`} className='text-sm text-slate-600'>Drag the text to move it. Pinch with two fingers to resize it, or drag the right handle to change line wrapping. You can scroll outside the photo.</p>
+      <div className='rounded-xl border border-cyan-200 bg-white/80 p-3 text-sm text-slate-700' role='status'>
+        <strong>Photo status:</strong> {photoStatus}
+        {source?.conversion && (
+          <dl className='mt-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs'>
+            <dt className='font-semibold'>File</dt><dd className='break-all'>{source.conversion.fileName}</dd>
+            <dt className='font-semibold'>Browser type</dt><dd>{source.conversion.reportedMimeType} ({source.conversion.extension})</dd>
+            <dt className='font-semibold'>Actual format</dt><dd>{source.conversion.detectedFormat}</dd>
+            <dt className='font-semibold'>Editing copy</dt><dd>{source.conversion.editingFormat} via {source.conversion.decoder}</dd>
+          </dl>
+        )}
+      </div>
       {source ? (
         <div ref={frame} className='relative mx-auto w-full max-w-xl select-none overflow-hidden rounded-2xl bg-slate-200 shadow-lg'
           style={{ aspectRatio: `${source.width} / ${source.height}`, touchAction: 'none' }}
@@ -171,7 +205,17 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
           )}
         </div>
       ) : <p role='status'>Opening photo…</p>}
-      {error ? <div role='alert' className='text-sm text-red-700'>{error} <Button type='button' variant='outline' onClick={() => { setError(''); setLayer(null); setRetry(n => n + 1); }}>Retry</Button></div>
+      {error ? <div role='alert' className='rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800'>
+        <p className='font-semibold'>{error}</p>
+        {diagnostic && <dl className='my-2 grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 text-xs'>
+          <dt className='font-semibold'>File</dt><dd className='break-all'>{diagnostic.fileName ?? photo.name}</dd>
+          <dt className='font-semibold'>Extension</dt><dd>{diagnostic.extension ?? 'unknown'}</dd>
+          <dt className='font-semibold'>Browser type</dt><dd>{diagnostic.reportedMimeType ?? (photo.type || 'not provided')}</dd>
+          <dt className='font-semibold'>Detected format</dt><dd>{diagnostic.detectedFormat ?? 'Unknown'}</dd>
+          <dt className='font-semibold'>Reason</dt><dd>{diagnostic.reason ?? 'unknown'}</dd>
+        </dl>}
+        <Button type='button' variant='outline' onClick={() => { setError(''); setLayer(null); setRetry(n => n + 1); }}>Retry</Button>
+      </div>
         : <p role='status' className='text-sm text-gray-600'>{ready ? 'Layout ready. The blue outline and handle will not be saved.' : gesturing ? 'Adjusting text…' : 'Updating text preview…'}</p>}
       <fieldset disabled={disabled || !source || gesturing} className='grid min-w-0 gap-3'>
         <div className='flex flex-wrap gap-2'>

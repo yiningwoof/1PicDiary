@@ -1,6 +1,8 @@
 import sharp from "sharp";
 import { DEFAULT_LAYOUT, boundLayout, clamp, type TextLayout } from "@/lib/text-layout";
 import { diaryOverlayText } from "@/lib/diary-overlay-text";
+export { orientedPhoto, PhotoInputError } from "@/lib/photo-input";
+import { orientedPhoto } from "@/lib/photo-input";
 
 export type TextPosition = "top" | "middle" | "bottom";
 
@@ -198,11 +200,6 @@ function wrapTextLine(
   }
 
   return lines.length > 0 ? lines : [text];
-}
-
-/** Normalize EXIF orientation before measuring or placing anything. */
-export async function orientedPhoto(imageBuffer: Buffer) {
-  return sharp(imageBuffer, { limitInputPixels: 60_000_000 }).rotate().png().toBuffer({ resolveWithObject: true });
 }
 
 export function layoutFromLegacy(input: Omit<ComposeDiaryImageInput, 'imageBuffer'>, width: number): TextLayout {
