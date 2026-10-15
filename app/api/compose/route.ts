@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import {
   composeDiaryImage,
+  PhotoInputError,
   isFontFamilyKey,
   resolveFontScale,
   resolveStrokeColor,
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "compose failed" },
-      { status: error instanceof LayoutValidationError ? 400 : 500 }
+      { status: error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : 500 }
     );
   }
 }

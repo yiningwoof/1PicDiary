@@ -5,6 +5,7 @@ import { uploadPhotoToGooglePhotos } from "@/lib/google-photos";
 import { addDiaryDateMetadata } from "@/lib/google-photo-metadata";
 import {
   composeDiaryImageWithLayout,
+  PhotoInputError,
   isFontFamilyKey,
   resolveFontScale,
   resolveStrokeColor,
@@ -133,7 +134,7 @@ export async function POST(request: Request) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "save failed" },
-      { status: error instanceof LayoutValidationError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
+      { status: error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
     );
   }
 }

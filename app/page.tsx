@@ -215,7 +215,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         <Input
           id={`${subject.id}-photo`}
           type='file'
-          accept='image/*'
+          accept='image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,image/tiff,image/gif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.tif,.tiff,.gif'
           onChange={(event) => {
             setPhoto(event.target.files?.[0] ?? null);
             setPhotoVersion((v) => v + 1);
@@ -224,6 +224,11 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setPreviewUrl(null);
           }}
         />
+        <p className='text-sm text-slate-600'>
+          JPEG, PNG, WebP, AVIF, HEIC/HEIF, TIFF, and GIF are supported. For a
+          Live or Motion Photo, the still image is used for the diary; the full
+          original is kept when original-photo saving is enabled.
+        </p>
 
         <label htmlFor={`${subject.id}-diary`} className='text-sm font-medium'>
           Diary line

@@ -1,7 +1,31 @@
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 
-import { composeDiaryImage, wrapText } from "@/lib/image";
+import { composeDiaryImage, orientedPhoto, wrapText } from "@/lib/image";
+
+describe("orientedPhoto", () => {
+  it.each(["jpeg", "png", "webp", "avif", "tiff", "gif"] as const)(
+    "normalizes %s input for editing",
+    async (format) => {
+      const pipeline = sharp({
+        create: { width: 24, height: 18, channels: 3, background: "#336699" },
+      });
+      const input = await pipeline[format]().toBuffer();
+      const { data, info } = await orientedPhoto(input);
+
+      expect(info.format).toBe("png");
+      expect(info.width).toBe(24);
+      expect(info.height).toBe(18);
+      expect(data.byteLength).toBeGreaterThan(0);
+    },
+  );
+
+  it("rejects a non-image with a user-facing format error", async () => {
+    await expect(orientedPhoto(Buffer.from("not an image"))).rejects.toThrow(
+      "do not match a supported photo format",
+    );
+  });
+});
 
 describe("composeDiaryImage", () => {
   it("composes diary text onto the source image", async () => {
