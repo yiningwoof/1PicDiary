@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { albumNames } from '@/lib/album-names';
 import type { DiarySubject } from '@/lib/subjects';
@@ -12,6 +12,7 @@ export function SubjectDiaries({ children: renderDiary }: { children: (subject: 
   const [selected, setSelected] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [needsReconnect, setNeedsReconnect] = useState(false);
   const [ready, setReady] = useState(false);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -29,8 +30,16 @@ export function SubjectDiaries({ children: renderDiary }: { children: (subject: 
   async function loadSubjects() {
     setLoading(true);
     setError('');
+    setNeedsReconnect(false);
     setReady(false);
     try {
+      const statusResponse = await fetch('/api/auth/google/status', { cache: 'no-store' });
+      const statusResult = await statusResponse.json().catch(() => ({}));
+      if (!statusResponse.ok) {
+        setNeedsReconnect(Boolean(statusResult.reconnectRequired));
+        throw new Error(statusResult.error ?? 'Unable to verify your Google Photos connection.');
+      }
+
       const response = await fetch('/api/subjects', { cache: 'no-store' });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? 'Unable to load your subjects.');
@@ -127,8 +136,12 @@ export function SubjectDiaries({ children: renderDiary }: { children: (subject: 
         </div>
         {loading ? <p role='status'>Loading your subjects…</p> : error ? (
           <div className='space-y-3'>
-            <p role='alert'>{error}</p>
-            <Button type='button' variant='outline' onClick={() => void loadSubjects()}>Retry</Button>
+            <p role='alert' className='rounded-2xl border border-rose-200 bg-rose-50 p-4 font-medium text-rose-950'>{error}</p>
+            {needsReconnect ? (
+              <a href='/api/auth/google/start' className={buttonVariants()}>Reconnect Google Photos</a>
+            ) : (
+              <Button type='button' variant='outline' onClick={() => void loadSubjects()}>Retry connection check</Button>
+            )}
           </div>
         ) : profiles.length ? (
           <div className='grid gap-3 sm:grid-cols-2' aria-label='Subjects'>

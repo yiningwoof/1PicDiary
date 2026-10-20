@@ -34,9 +34,10 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
     | { kind: 'idle' }
     | { kind: 'saving'; message: string }
     | { kind: 'success'; message: string; warnings: string[] }
-    | { kind: 'error'; message: string }
+    | { kind: 'error'; message: string; reconnectRequired?: boolean }
+    | { kind: 'reconnecting'; message: string }
   >({ kind: 'idle' });
-  const saving = saveState.kind === 'saving';
+  const saving = saveState.kind === 'saving' || saveState.kind === 'reconnecting';
   const overlayText = useMemo(
     () => isDiaryDate(diaryDate) ? diaryOverlayText(diaryDate, diaryText) : '',
     [diaryDate, diaryText],
@@ -87,7 +88,11 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setSaveState({ kind: 'error', message: payload.error ?? 'Save failed. Your draft is still here.' });
+        setSaveState({
+          kind: 'error',
+          message: payload.error ?? 'Save failed. Your draft is still here.',
+          reconnectRequired: Boolean(payload.reconnectRequired),
+        });
         return;
       }
 
@@ -99,6 +104,50 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
     } catch {
       setSaveState({ kind: 'error', message: 'The save could not be confirmed. Check the album before retrying; your draft is still here.' });
     }
+  }
+
+  function reconnectAndResume() {
+    const popup = window.open(
+      '/api/auth/google/start?mode=popup',
+      'google-photos-reconnect',
+      'popup=yes,width=560,height=720',
+    );
+    if (!popup) {
+      setSaveState({ kind: 'error', message: 'Allow pop-ups for this site, then reconnect again.', reconnectRequired: true });
+      return;
+    }
+
+    setSaveState({ kind: 'reconnecting', message: 'Finish reconnecting in the Google window. Your draft stays on this page.' });
+    let finished = false;
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      window.clearInterval(closedCheck);
+      window.clearTimeout(timeout);
+    };
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin || event.data?.type !== 'google-oauth-complete') return;
+      finished = true;
+      cleanup();
+      if (event.data.success) {
+        void saveDiary();
+      } else {
+        setSaveState({ kind: 'error', message: 'Google Photos was not reconnected. Your draft is still here.', reconnectRequired: true });
+      }
+    };
+    window.addEventListener('message', onMessage);
+    const closedCheck = window.setInterval(() => {
+      if (!finished && popup.closed) {
+        cleanup();
+        setSaveState({ kind: 'error', message: 'The Google connection window was closed. Your draft is still here.', reconnectRequired: true });
+      }
+    }, 500);
+    const timeout = window.setTimeout(() => {
+      if (!finished) {
+        cleanup();
+        popup.close();
+        setSaveState({ kind: 'error', message: 'Google Photos reconnection timed out. Your draft is still here.', reconnectRequired: true });
+      }
+    }, 5 * 60 * 1000);
   }
 
   return (
@@ -199,20 +248,22 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       </fieldset>
 
       {saveState.kind !== 'idle' ? (
-        <SaveStatusModal state={saveState} onClose={() => setSaveState({ kind: 'idle' })} />
+        <SaveStatusModal state={saveState} onClose={() => setSaveState({ kind: 'idle' })} onReconnect={reconnectAndResume} />
       ) : null}
     </div>
   );
 }
 
-function SaveStatusModal({ state, onClose }: {
+function SaveStatusModal({ state, onClose, onReconnect }: {
   state:
     | { kind: 'saving'; message: string }
     | { kind: 'success'; message: string; warnings: string[] }
-    | { kind: 'error'; message: string };
+    | { kind: 'error'; message: string; reconnectRequired?: boolean }
+    | { kind: 'reconnecting'; message: string };
   onClose: () => void;
+  onReconnect: () => void;
 }) {
-  const saving = state.kind === 'saving';
+  const saving = state.kind === 'saving' || state.kind === 'reconnecting';
   const success = state.kind === 'success';
 
   return (
@@ -227,12 +278,12 @@ function SaveStatusModal({ state, onClose }: {
         {saving ? (
           <>
             <div className='mx-auto h-14 w-14 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600' aria-hidden='true' />
-            <h2 className='mt-5 text-2xl font-black text-violet-950'>Saving your diary</h2>
+            <h2 className='mt-5 text-2xl font-black text-violet-950'>{state.kind === 'reconnecting' ? 'Reconnect Google Photos' : 'Saving your diary'}</h2>
             <p className='mt-2 text-sm text-slate-600'>{state.message}</p>
             <div className='mt-6 h-2 overflow-hidden rounded-full bg-violet-100' role='progressbar' aria-label='Diary save in progress'>
               <div className='h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500' />
             </div>
-            <p className='mt-3 text-xs text-slate-500'>Keep this page open until the save finishes.</p>
+            <p className='mt-3 text-xs text-slate-500'>{state.kind === 'reconnecting' ? 'Your photo, diary text, and layout are being kept here.' : 'Keep this page open until the save finishes.'}</p>
           </>
         ) : success ? (
           <>
@@ -251,7 +302,10 @@ function SaveStatusModal({ state, onClose }: {
             <div className='mx-auto grid h-16 w-16 place-items-center rounded-full bg-rose-500 text-3xl font-black text-white shadow-lg shadow-rose-200' aria-hidden='true'>!</div>
             <h2 className='mt-5 text-2xl font-black text-rose-950'>Could not save</h2>
             <p className='mt-2 text-sm text-rose-900'>{state.message}</p>
-            <Button type='button' variant='outline' onClick={onClose} className='mt-6 min-h-11 w-full'>Return to your draft</Button>
+            {state.reconnectRequired ? (
+              <Button type='button' onClick={onReconnect} className='mt-6 min-h-11 w-full'>Reconnect and continue saving</Button>
+            ) : null}
+            <Button type='button' variant='outline' onClick={onClose} className={`${state.reconnectRequired ? 'mt-3' : 'mt-6'} min-h-11 w-full`}>Return to your draft</Button>
           </>
         )}
       </div>

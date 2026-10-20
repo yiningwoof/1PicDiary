@@ -3,9 +3,10 @@ import { randomUUID } from "node:crypto";
 
 import { buildGoogleOAuthUrl } from "@/lib/google-auth";
 
-export function GET() {
+export function GET(request: Request) {
   try {
-    const state = randomUUID();
+    const popup = new URL(request.url).searchParams.get("mode") === "popup";
+    const state = `${popup ? "popup:" : ""}${randomUUID()}`;
     const response = NextResponse.redirect(buildGoogleOAuthUrl(state));
     response.cookies.set("google_oauth_state", state, {
       httpOnly: true,

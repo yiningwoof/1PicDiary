@@ -7,13 +7,18 @@ vi.mock('next/headers', () => ({ cookies: mocks.cookies }));
 vi.mock('@/lib/subject-account', async (original) => ({
   ...await original<typeof import('@/lib/subject-account')>(), getSubjectAccount: mocks.account,
 }));
-vi.mock('@/lib/google-photos', () => ({ uploadPhotoToGooglePhotos: mocks.upload, getOrCreateAlbum: mocks.getAlbum }));
+vi.mock('@/lib/google-photos', async (original) => ({
+  ...await original<typeof import('@/lib/google-photos')>(),
+  uploadPhotoToGooglePhotos: mocks.upload,
+  getOrCreateAlbum: mocks.getAlbum,
+}));
 vi.mock('@/lib/google-photo-metadata', () => ({ addDiaryDateMetadata: mocks.metadata }));
 vi.mock('@/lib/image', async (original) => ({
   ...await original<typeof import('@/lib/image')>(), composeDiaryImageWithLayout: mocks.compose,
 }));
 vi.mock('@/lib/supabase', () => ({ getSupabaseServerClient: () => null }));
 import { DEFAULT_LAYOUT } from '@/lib/text-layout';
+import { GooglePhotosError } from '@/lib/google-photos';
 import { POST as save } from '@/app/api/save-diary/route';
 import { GET as list, POST as add } from '@/app/api/subjects/route';
 
@@ -91,6 +96,19 @@ describe('subject album routing', () => {
     expect((await save(request('00000000-0000-4000-8000-000000000001'))).status).toBe(404);
     expect(db.query.eq).toHaveBeenCalledWith('google_owner_id', 'other-owner');
     expect(mocks.upload).not.toHaveBeenCalled();
+  });
+  it('asks the client to reconnect when Google rejects the access token during save', async () => {
+    const subject = { id: '00000000-0000-4000-8000-000000000001', name: 'A', diary_album_title: 'A diary', google_diary_album_id: 'album-a' };
+    const db = dbFor(subject);
+    mocks.account.mockResolvedValue({ ownerId: 'owner', accessToken: 'expired', supabase: db });
+    mocks.upload.mockRejectedValue(new GooglePhotosError('Google Photos upload failed: 401', 401));
+
+    const response = await save(request(subject.id));
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.reconnectRequired).toBe(true);
+    expect(db.query.insert).not.toHaveBeenCalled();
   });
   it('lists only profiles belonging to the verified account', async () => {
     const db = dbFor(null);

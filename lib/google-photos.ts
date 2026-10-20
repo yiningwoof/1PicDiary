@@ -5,6 +5,13 @@ type Album = {
   title: string;
 };
 
+export class GooglePhotosError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "GooglePhotosError";
+  }
+}
+
 async function photosFetch<T>(
   accessToken: string,
   path: string,
@@ -20,7 +27,7 @@ async function photosFetch<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`Google Photos API error: ${response.status}`);
+    throw new GooglePhotosError(`Google Photos API error: ${response.status}`, response.status);
   }
 
   return (await response.json()) as T;
@@ -93,7 +100,7 @@ export async function uploadPhotoToGooglePhotos({
   });
 
   if (!uploadResponse.ok) {
-    throw new Error(`Google Photos upload failed: ${uploadResponse.status}`);
+    throw new GooglePhotosError(`Google Photos upload failed: ${uploadResponse.status}`, uploadResponse.status);
   }
 
   const uploadToken = await uploadResponse.text();

@@ -31,23 +31,35 @@ function getAuthErrorCode(error: unknown) {
   return "token_error";
 }
 
+function popupResponse(success: boolean, error?: string) {
+  const payload = JSON.stringify({ type: "google-oauth-complete", success, ...(error ? { error } : {}) });
+  return new NextResponse(`<!doctype html><html><head><meta charset="utf-8"><title>Google Photos connection</title></head><body><p>${success ? "Google Photos connected. You can close this window." : "Google Photos could not be connected. Close this window and try again."}</p><script>window.opener?.postMessage(${payload}, window.location.origin);${success ? "window.close();" : ""}</script></body></html>`, {
+    status: success ? 200 : 400,
+    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
+  });
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const publicOrigin = getPublicOrigin(url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
+  const popup = state?.startsWith("popup:") ?? false;
   const cookieStore = await cookies();
   const expectedState = cookieStore.get("google_oauth_state")?.value;
 
   if (url.searchParams.has("error")) {
+    if (popup) return popupResponse(false, "cancelled");
     return NextResponse.redirect(new URL("/connect-google-photos?auth=cancelled", publicOrigin));
   }
 
   if (!code) {
+    if (popup) return popupResponse(false, "missing_code");
     return NextResponse.redirect(new URL("/connect-google-photos?auth=missing_code", publicOrigin));
   }
 
   if (!state || !expectedState || state !== expectedState) {
+    if (popup) return popupResponse(false, "state_error");
     return NextResponse.redirect(new URL("/connect-google-photos?auth=state_error", publicOrigin));
   }
 
@@ -62,7 +74,9 @@ export async function GET(request: Request) {
       refreshToken: token.refresh_token,
       expiresIn: token.expires_in,
     });
-    const response = NextResponse.redirect(new URL("/connect-google-photos?auth=ok", publicOrigin));
+    const response = popup
+      ? popupResponse(true)
+      : NextResponse.redirect(new URL("/connect-google-photos?auth=ok", publicOrigin));
 
     response.cookies.set(GOOGLE_SESSION_COOKIE, session.id, {
       httpOnly: true,
@@ -83,6 +97,7 @@ export async function GET(request: Request) {
       error instanceof Error ? error.message : "Unknown error",
     );
     const authError = getAuthErrorCode(error);
+    if (popup) return popupResponse(false, authError);
     return NextResponse.redirect(new URL(`/connect-google-photos?auth=${authError}`, publicOrigin));
   }
 }

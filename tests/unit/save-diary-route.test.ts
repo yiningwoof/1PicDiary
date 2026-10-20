@@ -23,7 +23,8 @@ describe("POST /api/save-diary", () => {
     const payload = await response.json();
 
     expect(response.status).toBe(401);
-    expect(payload.error).toContain("Connect Google Photos");
+    expect(payload.error).toContain("Reconnect");
+    expect(payload.reconnectRequired).toBe(true);
   });
 
   it("returns 400 when photo field is missing", async () => {

@@ -113,6 +113,29 @@ describe("GET /api/auth/google/callback", () => {
     expect(response.cookies.get("google_oauth_state")?.value).toBe("");
   });
 
+  it("notifies the opener after a popup reconnect succeeds", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn(() => ({ value: "popup:match-state" })),
+    });
+    exchangeCodeForTokenMock.mockResolvedValue({
+      access_token: "test-access-token",
+      expires_in: 3600,
+      refresh_token: "test-refresh-token",
+    });
+
+    const response = await GET(new Request(
+      "http://localhost/api/auth/google/callback?code=abc&state=popup:match-state"
+    ));
+    const html = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("text/html");
+    expect(html).toContain("google-oauth-complete");
+    expect(html).toContain('"success":true');
+    expect(html).toContain("window.close()");
+    expect(response.cookies.get("google_session_id")?.value).toBe("session-id");
+  });
+
   it("uses the configured public origin instead of the container request origin", async () => {
     vi.stubEnv(
       "GOOGLE_REDIRECT_URI",

@@ -1,7 +1,7 @@
 import { parseTextLayout, LayoutValidationError } from '@/lib/text-layout';
 import { NextResponse } from "next/server";
 
-import { uploadPhotoToGooglePhotos } from "@/lib/google-photos";
+import { GooglePhotosError, uploadPhotoToGooglePhotos } from "@/lib/google-photos";
 import { addDiaryDateMetadata } from "@/lib/google-photo-metadata";
 import {
   composeDiaryImageWithLayout,
@@ -132,9 +132,18 @@ export async function POST(request: Request) {
       warnings,
     });
   } catch (error) {
+    const reconnectRequired =
+      (error instanceof SubjectAccountError && error.status === 401) ||
+      (error instanceof GooglePhotosError && (error.status === 401 || error.status === 403));
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "save failed" },
-      { status: error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
+      {
+        error: reconnectRequired
+          ? "Your Google Photos connection expired. Reconnect to continue saving this draft."
+          : error instanceof Error ? error.message : "save failed",
+        ...(reconnectRequired ? { reconnectRequired: true } : {}),
+      },
+      { status: reconnectRequired ? 401 : error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
     );
   }
 }
