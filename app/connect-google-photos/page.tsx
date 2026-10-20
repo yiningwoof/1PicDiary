@@ -99,18 +99,18 @@ export default async function ConnectGooglePhotos({
 
         <li className="space-y-3 rounded-3xl border border-rose-100 bg-white/85 p-6 shadow-lg shadow-rose-100/50 backdrop-blur">
           <p className="text-sm font-bold uppercase tracking-wider text-rose-600">Step 3</p>
-          <h2 className="text-2xl font-bold">Preview and save your first memory</h2>
+          <h2 className="text-2xl font-bold">Position and save your first memory</h2>
           <p className="text-sm text-slate-600">
             Pick a subject, upload a photo, and write a diary line. Adjust the text,
-            preview your image, then choose “Save to Google Photos”. The saved
-            image includes the subject’s name and diary text. Find it in Google
-            Photos in the selected subject’s album.
+            position the diary text directly on the image, then choose “Save to
+            Google Photos”. Find the finished image in the selected subject’s
+            album.
           </p>
           <Link href="/" className="inline-flex min-h-11 items-center rounded-xl bg-gradient-to-r from-rose-500 to-fuchsia-500 px-5 py-2 text-sm font-bold text-white shadow-md shadow-rose-200 transition hover:-translate-y-0.5 hover:shadow-lg">
             {connected ? "Continue to your diary" : "Try the diary editor"}
           </Link>
           <p className="text-xs text-slate-500">
-            Connect first to load your subjects and albums, then preview and save
+            Connect first to load your subjects and albums, then position and save
             a diary for the selected subject. Uploaded images may count toward your Google storage.
           </p>
         </li>

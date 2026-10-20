@@ -1,7 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import Image from 'next/image';
+import { useCallback, useMemo, useState } from 'react';
 import { SubjectDiaries } from '@/components/subject-diaries';
 import { localDiaryDate, isDiaryDate } from '@/lib/diary-date';
 import type { DiarySubject } from '@/lib/subjects';
@@ -31,10 +30,13 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
   const [layoutReady, setLayoutReady] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(0);
   const [photo, setPhoto] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>('');
-  const [saving, setSaving] = useState(false);
-  const [previewing, setPreviewing] = useState(false);
+  const [saveState, setSaveState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'saving'; message: string }
+    | { kind: 'success'; message: string; warnings: string[] }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+  const saving = saveState.kind === 'saving';
   const overlayText = useMemo(
     () => isDiaryDate(diaryDate) ? diaryOverlayText(diaryDate, diaryText) : '',
     [diaryDate, diaryText],
@@ -46,71 +48,9 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       setLayoutText(overlayText);
       setLayout(next);
       setLayoutReady(ready);
-      setPreviewUrl(null);
     },
     [overlayText],
   );
-
-  useEffect(
-    () => () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    },
-    [previewUrl],
-  );
-
-  async function generatePreview() {
-    if (
-      !photo ||
-      !diaryText.trim() ||
-      !layout ||
-      !layoutReady ||
-      layoutText !== overlayText
-    ) {
-      setStatus(
-        'Add a photo and diary line, then wait for the text layout to finish updating.',
-      );
-      return;
-    }
-
-    setPreviewing(true);
-    setStatus('Generating preview...');
-    try {
-      const formData = new FormData();
-      formData.set('photo', photo);
-      formData.set('subjectName', subjectName);
-      formData.set('diaryText', diaryText);
-      formData.set('diaryDate', diaryDate);
-      formData.set('textLayout', JSON.stringify(layout));
-      const response = await fetch('/api/compose', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        setStatus(payload.error ?? 'Preview failed');
-        return;
-      }
-
-      const blob = await response.blob();
-      const nextPreviewUrl = URL.createObjectURL(blob);
-      setPreviewUrl((previous) => {
-        if (previous) {
-          URL.revokeObjectURL(previous);
-        }
-        return nextPreviewUrl;
-      });
-      setStatus('Preview ready. You can now save it to Google Photos.');
-    } catch {
-      setStatus(
-        'Preview could not be generated. Your draft is still here; please retry.',
-      );
-    } finally {
-      setPreviewing(false);
-    }
-  }
 
   async function saveDiary() {
     if (
@@ -120,19 +60,16 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       !layoutReady ||
       layoutText !== overlayText
     ) {
-      setStatus(
-        'Add a photo and diary line, then wait for the text layout to finish updating.',
-      );
+      setSaveState({ kind: 'error', message: 'Add a photo and diary line, then wait for the text layout to finish updating.' });
       return;
     }
 
     if (!isDiaryDate(diaryDate)) {
-      setStatus('Please choose a valid diary date.');
+      setSaveState({ kind: 'error', message: 'Please choose a valid diary date.' });
       return;
     }
 
-    setSaving(true);
-    setStatus(`Saving to ${albumTitle}...`);
+    setSaveState({ kind: 'saving', message: `Creating your diary image and saving it to ${albumTitle}…` });
     try {
       const formData = new FormData();
       formData.set('photo', photo);
@@ -150,23 +87,17 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       const payload = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        setStatus(payload.error ?? 'Save failed');
-        setSaving(false);
+        setSaveState({ kind: 'error', message: payload.error ?? 'Save failed. Your draft is still here.' });
         return;
       }
 
-      const warnings = payload.warnings?.length
-        ? ` (warnings: ${payload.warnings.join('; ')})`
-        : '';
-      setStatus(
-        `Saved diary entry for ${subjectName} to ${albumTitle}.${warnings}`,
-      );
+      setSaveState({
+        kind: 'success',
+        message: `Saved ${subjectName}'s diary entry to ${albumTitle}.`,
+        warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
+      });
     } catch {
-      setStatus(
-        'The save could not be confirmed. Check the album before retrying; your draft is still here.',
-      );
-    } finally {
-      setSaving(false);
+      setSaveState({ kind: 'error', message: 'The save could not be confirmed. Check the album before retrying; your draft is still here.' });
     }
   }
 
@@ -187,7 +118,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         )}
       </div>
       <fieldset
-        disabled={saving || previewing}
+        disabled={saving}
         className='grid min-w-0 gap-3 rounded-3xl border border-white/80 bg-white/85 p-5 shadow-lg shadow-violet-100/50 backdrop-blur sm:p-7'
       >
         <label htmlFor={`${subject.id}-date`} className='text-sm font-medium'>
@@ -203,7 +134,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           onChange={(event) => {
             setDiaryDate(event.target.value);
             setLayoutReady(false);
-            setPreviewUrl(null);
+            setSaveState({ kind: 'idle' });
           }}
         />
         <p className='text-sm text-slate-600'>
@@ -221,7 +152,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setPhotoVersion((v) => v + 1);
             setLayout(null);
             setLayoutReady(false);
-            setPreviewUrl(null);
+            setSaveState({ kind: 'idle' });
           }}
         />
         <p className='text-sm text-slate-600'>
@@ -239,7 +170,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           onChange={(event) => {
             setDiaryText(event.target.value);
             setLayoutReady(false);
-            setPreviewUrl(null);
+            setSaveState({ kind: 'idle' });
           }}
           maxLength={80}
           placeholder='For example: We built blocks together and laughed all afternoon.'
@@ -250,50 +181,80 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             key={photoVersion}
             photo={photo}
             text={overlayText}
-            disabled={saving || previewing}
+            disabled={saving}
             onChange={onLayoutChange}
           />
         )}
-        <div className='flex flex-wrap gap-2'>
-          <Button
-            type='button'
-            variant='outline'
-            onClick={generatePreview}
-            disabled={!layoutReady || layoutText !== overlayText}
-          >
-            {previewing ? 'Generating preview…' : 'Preview composed image'}
-          </Button>
+        <div className='grid gap-2'>
           <Button
             type='button'
             onClick={saveDiary}
             disabled={saving || !layoutReady || layoutText !== overlayText}
+            className='min-h-12 w-full text-base font-bold shadow-lg shadow-violet-200 sm:w-auto sm:px-8'
           >
-            {saving ? 'Saving...' : 'Save to Google Photos'}
+            {saving ? 'Saving your diary…' : 'Save to Google Photos'}
           </Button>
+          <p className='text-xs text-slate-500'>The positioned image above is what will be saved.</p>
         </div>
       </fieldset>
 
-      <div className='grid gap-3 rounded-3xl border border-fuchsia-100 bg-gradient-to-br from-white to-fuchsia-50/70 p-5 shadow-lg shadow-fuchsia-100/40'>
-        <h2 className='text-lg font-bold text-fuchsia-900'>Preview</h2>
-        {previewUrl ? (
-          <Image
-            src={previewUrl}
-            alt='Composed diary preview'
-            width={800}
-            height={800}
-            unoptimized
-            className='max-h-96 w-auto rounded-2xl object-contain shadow-md'
-          />
+      {saveState.kind !== 'idle' ? (
+        <SaveStatusModal state={saveState} onClose={() => setSaveState({ kind: 'idle' })} />
+      ) : null}
+    </div>
+  );
+}
+
+function SaveStatusModal({ state, onClose }: {
+  state:
+    | { kind: 'saving'; message: string }
+    | { kind: 'success'; message: string; warnings: string[] }
+    | { kind: 'error'; message: string };
+  onClose: () => void;
+}) {
+  const saving = state.kind === 'saving';
+  const success = state.kind === 'success';
+
+  return (
+    <div className='fixed inset-0 z-50 grid place-items-center bg-slate-950/55 p-4 backdrop-blur-sm' role='presentation'>
+      <div
+        role='dialog'
+        aria-modal='true'
+        aria-live='assertive'
+        aria-label={saving ? 'Saving diary' : success ? 'Diary saved' : 'Save failed'}
+        className={`w-full max-w-md rounded-3xl border p-7 text-center shadow-2xl ${success ? 'border-emerald-200 bg-emerald-50' : state.kind === 'error' ? 'border-rose-200 bg-rose-50' : 'border-violet-200 bg-white'}`}
+      >
+        {saving ? (
+          <>
+            <div className='mx-auto h-14 w-14 animate-spin rounded-full border-4 border-violet-200 border-t-violet-600' aria-hidden='true' />
+            <h2 className='mt-5 text-2xl font-black text-violet-950'>Saving your diary</h2>
+            <p className='mt-2 text-sm text-slate-600'>{state.message}</p>
+            <div className='mt-6 h-2 overflow-hidden rounded-full bg-violet-100' role='progressbar' aria-label='Diary save in progress'>
+              <div className='h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-cyan-500 via-violet-500 to-fuchsia-500' />
+            </div>
+            <p className='mt-3 text-xs text-slate-500'>Keep this page open until the save finishes.</p>
+          </>
+        ) : success ? (
+          <>
+            <div className='mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-500 text-4xl font-black text-white shadow-lg shadow-emerald-200' aria-hidden='true'>✓</div>
+            <h2 className='mt-5 text-2xl font-black text-emerald-950'>Diary saved</h2>
+            <p className='mt-2 text-sm text-emerald-900'>{state.message}</p>
+            {state.warnings.length > 0 ? (
+              <ul className='mt-4 space-y-2 rounded-2xl bg-amber-50 p-4 text-left text-xs text-amber-950'>
+                {state.warnings.map((warning) => <li key={warning}>• {warning}</li>)}
+              </ul>
+            ) : null}
+            <Button type='button' onClick={onClose} className='mt-6 min-h-11 w-full bg-emerald-600 hover:bg-emerald-700'>Done</Button>
+          </>
         ) : (
-          <p className='rounded-2xl border border-dashed border-fuchsia-200 bg-white/60 p-8 text-center text-sm text-slate-500'>No composed preview yet</p>
+          <>
+            <div className='mx-auto grid h-16 w-16 place-items-center rounded-full bg-rose-500 text-3xl font-black text-white shadow-lg shadow-rose-200' aria-hidden='true'>!</div>
+            <h2 className='mt-5 text-2xl font-black text-rose-950'>Could not save</h2>
+            <p className='mt-2 text-sm text-rose-900'>{state.message}</p>
+            <Button type='button' variant='outline' onClick={onClose} className='mt-6 min-h-11 w-full'>Return to your draft</Button>
+          </>
         )}
       </div>
-
-      {status ? (
-        <p role='status' className='rounded-2xl border border-violet-200 bg-violet-50 p-4 text-sm font-medium text-violet-950'>
-          {status}
-        </p>
-      ) : null}
     </div>
   );
 }
