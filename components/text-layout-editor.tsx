@@ -8,7 +8,7 @@ type FileDetails = { fileName?: string; extension?: string; reportedMimeType?: s
 type ConversionDetails = FileDetails & { editingFormat: string; decoder: string };
 type PhotoPreview = { url: string; width: number; height: number; conversion: ConversionDetails };
 type Layer = { url: string; key: string };
-type Gesture = { layout: TextLayout; points: Point[]; width: boolean };
+type Gesture = { layout: TextLayout; points: Point[] };
 
 function rasterKey(text: string, photo: PhotoPreview | null, layout: TextLayout) {
   // Moving a layer never requires another text-render request.
@@ -154,8 +154,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
 
   useEffect(() => { onChange(source ? layout : null, ready); }, [layout, source, ready, onChange]);
 
-  function rebase(width = false) {
-    gesture.current = { layout: current.current, points: [...points.current.values()], width };
+  function rebase() {
+    gesture.current = { layout: current.current, points: [...points.current.values()] };
   }
   function point(event: PointerEvent): Point {
     const rect = frame.current!.getBoundingClientRect();
@@ -170,7 +170,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
     event.currentTarget.setPointerCapture(event.pointerId);
     points.current.set(event.pointerId, point(event));
     setGesturing(true);
-    rebase(Boolean(target.closest('[data-width-handle]')) && points.current.size === 1);
+    rebase();
   }
   function move(event: PointerEvent<HTMLDivElement>) {
     if (!points.current.has(event.pointerId) || !gesture.current || !source) return;
@@ -185,9 +185,6 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
       const after = center(now);
       const scaled = scaleLayout(start.layout, distance(now) / Math.max(1, distance(start.points)), before);
       update({ ...scaled, box: { ...scaled.box, x: scaled.box.x + after.x - before.x, y: scaled.box.y + after.y - before.y } });
-    } else if (start.width) {
-      update({ ...start.layout, box: { ...start.layout.box,
-        width: clamp(start.layout.box.width + now[0].x - start.points[0].x, 0.15, 0.98 - start.layout.box.x) } });
     } else {
       update({ ...start.layout, box: { ...start.layout.box,
         x: start.layout.box.x + now[0].x - start.points[0].x,
@@ -215,7 +212,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   return (
     <section className='grid min-w-0 gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-violet-50/70 p-4' aria-label='Text layout editor'>
       <h3 className='text-lg font-bold text-violet-950'>Position your text</h3>
-      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag the text to move it. Pinch with two fingers to resize it, or drag the right handle to change line wrapping. You can scroll outside the photo.</p>
+      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag the text to move it. Pinch with two fingers to resize the entire text box, including its text and outline. You can scroll outside the photo.</p>
       <div className='rounded-xl border border-cyan-200 bg-white/80 p-3 text-sm text-slate-700' role='status'>
         <strong>Photo status:</strong> {photoStatus}
         {source?.conversion && (
@@ -241,7 +238,6 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
               style={{ left: `${layout.box.x * 100}%`, top: `${layout.box.y * 100}%`, width: `${layout.box.width * 100}%`, height: `${layout.box.height * 100}%` }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={layer.url} alt='' className='pointer-events-none h-full w-full' draggable={false} onLoad={() => setLayerLoaded(layer.url)} />
-              <span data-width-handle aria-hidden='true' className='absolute -right-3 top-1/2 flex h-12 w-6 -translate-y-1/2 cursor-ew-resize items-center justify-center rounded-full bg-fuchsia-600 text-white shadow-md'>↔</span>
             </div>
           )}
         </div>
@@ -257,7 +253,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
         </dl>}
         <Button type='button' variant='outline' onClick={() => { setError(''); setLayer(null); setRetry(n => n + 1); }}>Retry</Button>
       </div>
-        : <p role='status' className='text-sm text-gray-600'>{ready ? 'Layout ready. The blue outline and handle will not be saved.' : gesturing ? 'Adjusting text…' : 'Updating text preview…'}</p>}
+        : <p role='status' className='min-h-5 text-sm text-gray-600'>{ready ? <span className='invisible' aria-hidden='true'>Updating text preview…</span> : gesturing ? 'Adjusting text…' : 'Updating text preview…'}</p>}
       <fieldset disabled={disabled || !source || gesturing} className='grid min-w-0 gap-3'>
         <div className='flex flex-wrap gap-2'>
           {(['Top', 'Middle', 'Bottom'] as const).map((position) => <Button key={position} type='button' variant='outline' onClick={() => update({ ...layout, box: { ...layout.box, x: (1 - layout.box.width) / 2, y: position === 'Top' ? 0.05 : position === 'Middle' ? (1 - layout.box.height) / 2 : 0.95 - layout.box.height } })}>{position}</Button>)}
@@ -265,10 +261,6 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
         </div>
         <NumberStepper label='Text size' value={layout.fontSize} min={0.008} max={0.16} step={0.001}
           display={value => percent(value)} onChange={fontSize => update({ ...layout, fontSize })} />
-        <label className='grid gap-1 text-sm'>
-          <span className='flex items-center justify-between gap-3'><span>Textbox width</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.width, 0)}</output></span>
-          <input aria-label='Textbox width' type='range' min={0.15} max={0.96} step={0.01} value={layout.box.width} onChange={event => update({ ...layout, box: { ...layout.box, width: Number(event.target.value) } })} />
-        </label>
         <details>
           <summary className='cursor-pointer py-2 text-sm font-medium'>Text style and precise position</summary>
           <div className='grid gap-3 pt-2'>
