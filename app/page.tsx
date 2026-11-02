@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SubjectDiaries } from '@/components/subject-diaries';
 import { localDiaryDate, isDiaryDate } from '@/lib/diary-date';
 import type { DiarySubject } from '@/lib/subjects';
@@ -12,6 +12,41 @@ import { Textarea } from '@/components/ui/textarea';
 import { TextLayoutEditor } from '@/components/text-layout-editor';
 import type { TextLayout } from '@/lib/text-layout';
 import { diaryOverlayText } from '@/lib/diary-overlay-text';
+
+type DiaryDraft = {
+  diaryText: string;
+  diaryDate: string;
+  updatedAt: string;
+};
+
+type SavedEntryReminder = {
+  diaryText: string;
+  diaryDate: string;
+  savedAt: string;
+};
+
+const draftKey = (subjectId: string) => `1picdiary:draft:v1:${subjectId}`;
+const lastSavedKey = (subjectId: string) => `1picdiary:last-saved:v1:${subjectId}`;
+
+function readStoredEntry<T extends DiaryDraft | SavedEntryReminder>(key: string, timeField: 'updatedAt' | 'savedAt'): T | null {
+  try {
+    const entry = JSON.parse(window.localStorage.getItem(key) ?? 'null') as Record<string, unknown> | null;
+    if (!entry || typeof entry.diaryText !== 'string' || !entry.diaryText.trim() || entry.diaryText.length > 80 || typeof entry.diaryDate !== 'string' || !isDiaryDate(entry.diaryDate) || typeof entry[timeField] !== 'string') return null;
+    return entry as T;
+  } catch {
+    return null;
+  }
+}
+
+function friendlyDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  return `${month}/${day}/${year}`;
+}
+
+function friendlyTime(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+}
 
 export default function Home() {
   return (
@@ -26,6 +61,9 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
   const albumTitle = subject.diary_album_title;
   const [diaryDate, setDiaryDate] = useState(() => localDiaryDate());
   const [diaryText, setDiaryText] = useState('');
+  const [recoveryDraft, setRecoveryDraft] = useState<DiaryDraft | null>(null);
+  const [lastSaved, setLastSaved] = useState<SavedEntryReminder | null>(null);
+  const [draftNotice, setDraftNotice] = useState('');
   const [layout, setLayout] = useState<TextLayout | null>(null);
   const [layoutReady, setLayoutReady] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(0);
@@ -42,6 +80,46 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
     () => isDiaryDate(diaryDate) ? diaryOverlayText(diaryDate, diaryText) : '',
     [diaryDate, diaryText],
   );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setRecoveryDraft(readStoredEntry<DiaryDraft>(draftKey(subject.id), 'updatedAt'));
+      setLastSaved(readStoredEntry<SavedEntryReminder>(lastSavedKey(subject.id), 'savedAt'));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [subject.id]);
+
+  function storeDraft(nextText: string, nextDate: string) {
+    try {
+      if (!nextText.trim() || !isDiaryDate(nextDate)) {
+        window.localStorage.removeItem(draftKey(subject.id));
+        return;
+      }
+      window.localStorage.setItem(draftKey(subject.id), JSON.stringify({
+        diaryText: nextText,
+        diaryDate: nextDate,
+        updatedAt: new Date().toISOString(),
+      } satisfies DiaryDraft));
+      setDraftNotice('Draft saved on this device.');
+    } catch {
+      setDraftNotice('This browser could not save the draft locally.');
+    }
+  }
+
+  function applyEntry(entry: Pick<DiaryDraft, 'diaryText' | 'diaryDate'>) {
+    setDiaryText(entry.diaryText);
+    setDiaryDate(entry.diaryDate);
+    setLayoutReady(false);
+    setSaveState({ kind: 'idle' });
+    storeDraft(entry.diaryText, entry.diaryDate);
+    setRecoveryDraft(null);
+  }
+
+  function discardDraft() {
+    try { window.localStorage.removeItem(draftKey(subject.id)); } catch { /* The in-memory draft can still be dismissed. */ }
+    setRecoveryDraft(null);
+    setDraftNotice('');
+  }
 
   const [layoutText, setLayoutText] = useState('');
   const onLayoutChange = useCallback(
@@ -95,6 +173,19 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
         });
         return;
       }
+
+      const savedEntry: SavedEntryReminder = {
+        diaryText,
+        diaryDate,
+        savedAt: new Date().toISOString(),
+      };
+      try {
+        window.localStorage.removeItem(draftKey(subject.id));
+        window.localStorage.setItem(lastSavedKey(subject.id), JSON.stringify(savedEntry));
+      } catch { /* A successful Google Photos save does not depend on browser storage. */ }
+      setRecoveryDraft(null);
+      setLastSaved(savedEntry);
+      setDraftNotice('');
 
       setSaveState({
         kind: 'success',
@@ -166,6 +257,24 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           </p>
         )}
       </div>
+      {recoveryDraft ? (
+        <div className='rounded-3xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-5 shadow-md shadow-amber-100/60' role='status'>
+          <p className='text-sm font-bold uppercase tracking-wider text-amber-700'>Unfinished draft found</p>
+          <p className='mt-2 font-semibold text-slate-900'>{friendlyDate(recoveryDraft.diaryDate)} · “{recoveryDraft.diaryText}”</p>
+          <p className='mt-1 text-xs text-slate-600'>Saved on this device {friendlyTime(recoveryDraft.updatedAt)}</p>
+          <div className='mt-4 flex flex-wrap gap-2'>
+            <Button type='button' onClick={() => applyEntry(recoveryDraft)}>Restore draft</Button>
+            <Button type='button' variant='outline' onClick={discardDraft}>Discard</Button>
+          </div>
+        </div>
+      ) : lastSaved ? (
+        <div className='rounded-3xl border border-emerald-200 bg-emerald-50/80 p-5'>
+          <p className='text-sm font-bold uppercase tracking-wider text-emerald-700'>Last saved entry</p>
+          <p className='mt-2 text-sm text-slate-800'>{friendlyDate(lastSaved.diaryDate)} · “{lastSaved.diaryText}”</p>
+          <p className='mt-1 text-xs text-slate-600'>Saved {friendlyTime(lastSaved.savedAt)}</p>
+          <Button type='button' variant='outline' className='mt-3' onClick={() => applyEntry(lastSaved)}>Use text and date again</Button>
+        </div>
+      ) : null}
       <fieldset
         disabled={saving}
         className='grid min-w-0 gap-3 rounded-3xl border border-white/80 bg-white/85 p-5 shadow-lg shadow-violet-100/50 backdrop-blur sm:p-7'
@@ -181,7 +290,12 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           max='9999-12-31'
           value={diaryDate}
           onChange={(event) => {
-            setDiaryDate(event.target.value);
+            const nextDate = event.target.value;
+            setDiaryDate(nextDate);
+            if (diaryText.trim()) {
+              setRecoveryDraft(null);
+              storeDraft(diaryText, nextDate);
+            }
             setLayoutReady(false);
             setSaveState({ kind: 'idle' });
           }}
@@ -217,13 +331,17 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           id={`${subject.id}-diary`}
           value={diaryText}
           onChange={(event) => {
-            setDiaryText(event.target.value);
+            const nextText = event.target.value;
+            setDiaryText(nextText);
+            setRecoveryDraft(null);
+            storeDraft(nextText, diaryDate);
             setLayoutReady(false);
             setSaveState({ kind: 'idle' });
           }}
           maxLength={80}
           placeholder='For example: We built blocks together and laughed all afternoon.'
         />
+        {draftNotice ? <p role='status' className='text-xs font-medium text-violet-700'>{draftNotice}</p> : null}
 
         {photo && diaryText.trim() && (
           <TextLayoutEditor
