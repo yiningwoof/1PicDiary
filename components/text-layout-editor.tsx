@@ -25,6 +25,47 @@ function browserFormat(file: File) {
   return (mime || extension || 'unknown format').toUpperCase();
 }
 
+function NumberStepper({ label, value, min, max, step, display, onChange }: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  display: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const changeBy = (direction: -1 | 1) => {
+    const precision = Math.max(0, (step.toString().split('.')[1] ?? '').length);
+    const next = Number(clamp(value + direction * step, min, max).toFixed(precision));
+    onChange(next);
+  };
+
+  return (
+    <div className='grid gap-2 text-sm'>
+      <span className='font-medium'>{label}</span>
+      <div className='grid grid-cols-[3rem_minmax(5rem,1fr)_3rem] items-stretch overflow-hidden rounded-xl border border-violet-200 bg-white shadow-sm' role='group' aria-label={label}>
+        <button
+          type='button'
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          disabled={value <= min}
+          onClick={() => changeBy(-1)}
+          className='min-h-12 border-r border-violet-200 text-2xl font-bold text-violet-700 transition active:bg-violet-100 disabled:text-slate-300'
+        >−</button>
+        <output className='grid min-h-12 place-items-center bg-violet-50/60 px-3 font-mono text-base font-bold text-slate-800' aria-live='polite'>
+          {display(value)}
+        </output>
+        <button
+          type='button'
+          aria-label={`Increase ${label.toLowerCase()}`}
+          disabled={value >= max}
+          onClick={() => changeBy(1)}
+          className='min-h-12 border-l border-violet-200 text-2xl font-bold text-violet-700 transition active:bg-violet-100 disabled:text-slate-300'
+        >+</button>
+      </div>
+    </div>
+  );
+}
+
 export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   photo: File; text: string; disabled: boolean;
   onChange: (layout: TextLayout | null, ready: boolean) => void;
@@ -222,10 +263,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
           {(['Top', 'Middle', 'Bottom'] as const).map((position) => <Button key={position} type='button' variant='outline' onClick={() => update({ ...layout, box: { ...layout.box, x: (1 - layout.box.width) / 2, y: position === 'Top' ? 0.05 : position === 'Middle' ? (1 - layout.box.height) / 2 : 0.95 - layout.box.height } })}>{position}</Button>)}
           <Button type='button' variant='outline' onClick={() => update({ ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box } })}>Reset layout</Button>
         </div>
-        <label className='grid gap-1 text-sm'>
-          <span className='flex items-center justify-between gap-3'><span>Text size</span><output className='font-mono text-xs text-gray-600'>{percent(layout.fontSize)}</output></span>
-          <input aria-label='Text size' type='range' min={0.008} max={0.16} step={0.001} value={layout.fontSize} onChange={event => update({ ...layout, fontSize: Number(event.target.value) })} />
-        </label>
+        <NumberStepper label='Text size' value={layout.fontSize} min={0.008} max={0.16} step={0.001}
+          display={value => percent(value)} onChange={fontSize => update({ ...layout, fontSize })} />
         <label className='grid gap-1 text-sm'>
           <span className='flex items-center justify-between gap-3'><span>Textbox width</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.width, 0)}</output></span>
           <input aria-label='Textbox width' type='range' min={0.15} max={0.96} step={0.01} value={layout.box.width} onChange={event => update({ ...layout, box: { ...layout.box, width: Number(event.target.value) } })} />
@@ -239,7 +278,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
               </select>
             </label>
             <label className='flex items-center justify-between gap-3 text-sm'><span>Text color</span><span className='flex items-center gap-2'><output className='font-mono text-xs text-gray-600'>{layout.color.toUpperCase()}</output><input aria-label='Text color' type='color' value={layout.color} onChange={event => update({ ...layout, color: event.target.value })} /></span></label>
-            <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Outline width</span><output className='font-mono text-xs text-gray-600'>{percent(layout.strokeWidth, 2)}</output></span><input aria-label='Outline width' type='range' min={0} max={0.012} step={0.0005} value={layout.strokeWidth} onChange={event => update({ ...layout, strokeWidth: Number(event.target.value) })} /></label>
+            <NumberStepper label='Outline width' value={layout.strokeWidth} min={0} max={0.012} step={0.0005}
+              display={value => percent(value, 2)} onChange={strokeWidth => update({ ...layout, strokeWidth })} />
             <label className='flex items-center justify-between gap-3 text-sm'><span>Outline color</span><span className='flex items-center gap-2'><output className='font-mono text-xs text-gray-600'>{layout.strokeColor.toUpperCase()}</output><input aria-label='Outline color' type='color' value={layout.strokeColor} disabled={layout.strokeWidth === 0} onChange={event => update({ ...layout, strokeColor: event.target.value })} /></span></label>
             <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Horizontal position</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.x)}</output></span><input aria-label='Horizontal position' type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.width)} step={0.001} value={layout.box.x} onChange={event => update({ ...layout, box: { ...layout.box, x: Number(event.target.value) } })} /></label>
             <label className='grid gap-1 text-sm'><span className='flex items-center justify-between gap-3'><span>Vertical position</span><output className='font-mono text-xs text-gray-600'>{percent(layout.box.y)}</output></span><input aria-label='Vertical position' type='range' min={0.02} max={Math.max(0.02, 0.98 - layout.box.height)} step={0.001} value={layout.box.y} onChange={event => update({ ...layout, box: { ...layout.box, y: Number(event.target.value) } })} /></label>
