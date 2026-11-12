@@ -12,6 +12,7 @@ import {
   TextPosition,
 } from "@/lib/image";
 import { isDiaryDate } from '@/lib/diary-date';
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from '@/lib/upload-limits';
 
 export const runtime = "nodejs";
 
@@ -30,6 +31,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "photo is required" }, { status: 400 });
     }
 
+    if (exceedsGooglePhotosPhotoLimit(file.size)) {
+      return NextResponse.json({ error: googlePhotosPhotoLimitMessage }, { status: 413 });
+    }
+
     if (!diaryText.trim()) {
       return NextResponse.json({ error: "diaryText is required" }, { status: 400 });
     }
@@ -42,9 +47,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid textPosition" }, { status: 400 });
     }
 
-    if (file.size > 30 * 1024 * 1024 || diaryText.length > 80 || subjectName.length > 80) {
-      return NextResponse.json({ error: 'Choose a photo up to 30 MB and a diary line up to 80 characters.' }, { status: 400 });
-    }
     const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
     const composed = await composeDiaryImage({

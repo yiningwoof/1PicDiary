@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 export async function POST(request: Request) {
   try {
     const { text, width, height, layout: raw } = await request.json();
-    if (typeof text !== 'string' || !text.trim() || text.length > 1000 ||
+    if (typeof text !== 'string' || !text.trim() ||
       !Number.isInteger(width) || !Number.isInteger(height) || width < 32 || height < 32 ||
       width > 16000 || height > 16000 || width * height > 60_000_000) {
       return NextResponse.json({ error: 'Invalid image dimensions or text.' }, { status: 400 });

@@ -12,4 +12,6 @@ export function proxy(request: NextRequest) {
   return NextResponse.redirect(new URL(request.nextUrl.pathname + request.nextUrl.search, canonical), 308);
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"] };
+// Large photo requests bypass the canonical-host proxy so Next.js does not
+// buffer their request bodies. They are sent from an already-canonical page.
+export const config = { matcher: ["/((?!api/editor-photo|api/save-diary|api/compose|_next/static|_next/image|favicon.ico).*)"] };
