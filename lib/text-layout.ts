@@ -33,6 +33,18 @@ export function boundLayout(layout: TextLayout): TextLayout {
 }
 
 export type Point = { x: number; y: number };
+export function resizeLayoutWidth(layout: TextLayout, delta: number): TextLayout {
+  return boundLayout({ ...layout, source: 'manual', box: { ...layout.box,
+    width: clamp(layout.box.width + delta, 0.15, 0.98 - layout.box.x),
+  } });
+}
+
+export function resizeLayoutHeight(layout: TextLayout, delta: number): TextLayout {
+  return boundLayout({ ...layout, source: 'manual', box: { ...layout.box,
+    height: clamp(layout.box.height + delta, 0.05, 0.98 - layout.box.y),
+  } });
+}
+
 export function scaleLayout(layout: TextLayout, factor: number, anchor: Point): TextLayout {
   const scale = clamp(factor, 0.008 / layout.fontSize, 0.16 / layout.fontSize);
   const width = clamp(layout.box.width * scale, 0.15, 0.96);
