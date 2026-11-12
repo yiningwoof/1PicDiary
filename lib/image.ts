@@ -217,21 +217,23 @@ export async function renderTextLayer(text: string, width: number, height: numbe
   const marginX = Math.ceil(width * 0.02);
   const marginY = Math.ceil(height * 0.02);
   const pixelWidth = Math.max(1, Math.min(width - 2 * marginX, Math.round(layout.box.width * width)));
+  const pixelHeight = Math.max(1, Math.min(height - 2 * marginY, Math.round(layout.box.height * height)));
   const outline = Math.max(0, layout.strokeWidth * width);
   let fontSize = Math.max(1, layout.fontSize * width);
   let padding = 0;
   let lines: string[] = [];
-  let pixelHeight = 0;
-  // Text reflows on width changes. Shrink only if its entire block cannot fit the image.
+  let contentHeight = 0;
+  // Width controls wrapping and height controls the available text region.
+  // Shrink the font only when the complete block cannot fit that region.
   for (let attempt = 0; attempt < 150; attempt++) {
     padding = Math.ceil(fontSize * 0.3 + outline + 2);
     lines = wrapText(text, fontSize, Math.max(1, pixelWidth - 2 * padding));
-    pixelHeight = Math.ceil(lines.length * fontSize * 1.4 + 2 * padding);
-    if (pixelHeight <= (height - 2 * marginY) && padding * 2 < pixelWidth) break;
+    contentHeight = Math.ceil(lines.length * fontSize * 1.4 + 2 * padding);
+    if (contentHeight <= pixelHeight && padding * 2 < pixelWidth) break;
     fontSize *= 0.9;
   }
-  if (pixelHeight > height - 2 * marginY || padding * 2 >= pixelWidth) {
-    throw new Error('This image is too small for the text and outline. Reduce the outline or use a larger image.');
+  if (contentHeight > pixelHeight || padding * 2 >= pixelWidth) {
+    throw new Error('This text box is too small for the text and outline. Increase its width or height, reduce the outline, or use a larger image.');
   }
   const x = clamp(Math.round(layout.box.x * width), marginX, width - marginX - pixelWidth);
   const y = clamp(Math.round(layout.box.y * height), marginY, height - marginY - pixelHeight);

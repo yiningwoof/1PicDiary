@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { DEFAULT_LAYOUT, boundLayout, parseTextLayout, scaleLayout } from '@/lib/text-layout';
+import { DEFAULT_LAYOUT, boundLayout, parseTextLayout, resizeLayoutHeight, resizeLayoutWidth, scaleLayout } from '@/lib/text-layout';
 import { composeDiaryImageWithLayout, orientedPhoto, renderTextLayer } from '@/lib/image';
 
 describe('text layout', () => {
@@ -24,6 +24,17 @@ describe('text layout', () => {
     expect(next.fontSize).toBeCloseTo(layout.fontSize * 1.5);
     expect(next.strokeWidth).toBeCloseTo(.003);
   });
+  it('resizes width and height independently without changing text scale', () => {
+    const wider = resizeLayoutWidth(DEFAULT_LAYOUT, -.2);
+    expect(wider.box.width).toBeCloseTo(DEFAULT_LAYOUT.box.width - .2);
+    expect(wider.box.height).toBe(DEFAULT_LAYOUT.box.height);
+    expect(wider.fontSize).toBe(DEFAULT_LAYOUT.fontSize);
+
+    const taller = resizeLayoutHeight(DEFAULT_LAYOUT, .05);
+    expect(taller.box.height).toBeCloseTo(DEFAULT_LAYOUT.box.height + .05);
+    expect(taller.box.width).toBe(DEFAULT_LAYOUT.box.width);
+    expect(taller.fontSize).toBe(DEFAULT_LAYOUT.fontSize);
+  });
   it.each([{ ...DEFAULT_LAYOUT, version: 2 }, { ...DEFAULT_LAYOUT, color: '<svg>' }, { ...DEFAULT_LAYOUT, fontSize: NaN }, '{'])('rejects malformed layouts', value => {
     expect(() => parseTextLayout(value)).toThrow();
   });
@@ -34,10 +45,20 @@ describe('text layout', () => {
     const text = 'A: Today we walked to the park and watched the ducks.';
     const wide = await renderTextLayer(text, 1000, 800, DEFAULT_LAYOUT);
     const narrow = await renderTextLayer(text, 1000, 800, { ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box, width: .35 } });
-    expect(narrow.textLayout.box.height).toBeGreaterThan(wide.textLayout.box.height);
+    expect(narrow.textLayout.box.height).toBeCloseTo(DEFAULT_LAYOUT.box.height);
+    expect(wide.textLayout.box.height).toBeCloseTo(DEFAULT_LAYOUT.box.height);
+    expect(narrow.textLayout.fontSize).toBeLessThanOrEqual(wide.textLayout.fontSize);
     const replay = await renderTextLayer(text, 1000, 800, parseTextLayout(narrow.textLayout)!);
     expect(replay.png.equals(narrow.png)).toBe(true);
     expect(replay.textLayout).toEqual(narrow.textLayout);
+  });
+  it('preserves an independently resized height and fits text inside it', async () => {
+    const text = 'A: Today we walked to the park and watched the ducks together.';
+    const tall = await renderTextLayer(text, 1000, 800, { ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box, height: .3 } });
+    const short = await renderTextLayer(text, 1000, 800, { ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box, height: .1 } });
+    expect(tall.textLayout.box.height).toBeCloseTo(.3);
+    expect(short.textLayout.box.height).toBeCloseTo(.1);
+    expect(short.textLayout.fontSize).toBeLessThan(tall.textLayout.fontSize);
   });
   it('exports the exact preview layer at the resolved coordinates', async () => {
     const image = await sharp({ create: { width: 700, height: 900, channels: 3, background: '#336699' } }).png().toBuffer();
