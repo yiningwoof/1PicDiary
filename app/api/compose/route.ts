@@ -12,6 +12,7 @@ import {
   TextPosition,
 } from "@/lib/image";
 import { isDiaryDate } from '@/lib/diary-date';
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from '@/lib/upload-limits';
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "photo is required" }, { status: 400 });
+    }
+
+    if (exceedsGooglePhotosPhotoLimit(file.size)) {
+      return NextResponse.json({ error: googlePhotosPhotoLimitMessage }, { status: 413 });
     }
 
     if (!diaryText.trim()) {

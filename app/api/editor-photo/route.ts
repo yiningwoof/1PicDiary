@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { orientedPhoto, PhotoInputError } from '@/lib/image';
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from '@/lib/upload-limits';
 export const runtime = 'nodejs';
 
 function fileDetails(file: File) {
@@ -16,6 +17,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Choose a photo to inspect and edit.' }, { status: 400 });
     }
     uploadedFile = file;
+    if (exceedsGooglePhotosPhotoLimit(file.size)) {
+      return NextResponse.json({
+        error: googlePhotosPhotoLimitMessage,
+        details: { ...fileDetails(file), detectedFormat: 'Not inspected', reason: 'google-photos-file-size-limit' },
+      }, { status: 413 });
+    }
     const { data, info, sourceFormat, outputFormat, decoder } = await orientedPhoto(Buffer.from(await file.arrayBuffer()));
     if (info.width < 32 || info.height < 32 || info.width > 16000 || info.height > 16000) {
       return NextResponse.json({

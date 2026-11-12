@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { TextLayoutEditor } from '@/components/text-layout-editor';
 import type { TextLayout } from '@/lib/text-layout';
 import { diaryOverlayText } from '@/lib/diary-overlay-text';
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from '@/lib/upload-limits';
 
 type DiaryDraft = {
   diaryText: string;
@@ -311,7 +312,14 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           type='file'
           accept='image/jpeg,image/png,image/webp,image/avif,image/heic,image/heif,image/tiff,image/gif,.jpg,.jpeg,.png,.webp,.avif,.heic,.heif,.tif,.tiff,.gif'
           onChange={(event) => {
-            setPhoto(event.target.files?.[0] ?? null);
+            const nextPhoto = event.target.files?.[0] ?? null;
+            if (nextPhoto && exceedsGooglePhotosPhotoLimit(nextPhoto.size)) {
+              event.target.value = '';
+              setPhoto(null);
+              setSaveState({ kind: 'error', message: googlePhotosPhotoLimitMessage });
+              return;
+            }
+            setPhoto(nextPhoto);
             setPhotoVersion((v) => v + 1);
             setLayout(null);
             setLayoutReady(false);

@@ -1,3 +1,5 @@
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from "@/lib/upload-limits";
+
 const GOOGLE_PHOTOS_API = "https://photoslibrary.googleapis.com/v1";
 
 type Album = {
@@ -88,6 +90,9 @@ export async function uploadPhotoToGooglePhotos({
   mimeType?: string;
   description?: string;
 }) {
+  if (exceedsGooglePhotosPhotoLimit(imageBuffer.byteLength)) {
+    throw new GooglePhotosError(googlePhotosPhotoLimitMessage, 413);
+  }
   const normalizedDescription = description?.trim();
   if (normalizedDescription && normalizedDescription.length >= 1000) {
     throw new Error("Google Photos descriptions must be shorter than 1000 characters");

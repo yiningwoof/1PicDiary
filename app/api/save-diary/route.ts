@@ -16,6 +16,7 @@ import {
 import { SubjectAccountError, getSubjectAccount } from "@/lib/subject-account";
 import { sanitizeFileSegment } from "@/lib/security";
 import { isDiaryDate } from "@/lib/diary-date";
+import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from "@/lib/upload-limits";
 
 export const runtime = "nodejs";
 
@@ -34,6 +35,9 @@ export async function POST(request: Request) {
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "photo is required" }, { status: 400 });
+    }
+    if (exceedsGooglePhotosPhotoLimit(file.size)) {
+      return NextResponse.json({ error: googlePhotosPhotoLimitMessage }, { status: 413 });
     }
 
     if (!subjectId || !diaryText) {
@@ -136,6 +140,7 @@ export async function POST(request: Request) {
     const reconnectRequired =
       (error instanceof SubjectAccountError && error.status === 401) ||
       (error instanceof GooglePhotosError && (error.status === 401 || error.status === 403));
+    const googlePhotoTooLarge = error instanceof GooglePhotosError && error.status === 413;
 
     return NextResponse.json(
       {
@@ -144,7 +149,7 @@ export async function POST(request: Request) {
           : error instanceof Error ? error.message : "save failed",
         ...(reconnectRequired ? { reconnectRequired: true } : {}),
       },
-      { status: reconnectRequired ? 401 : error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
+      { status: reconnectRequired ? 401 : googlePhotoTooLarge ? 413 : error instanceof LayoutValidationError || error instanceof PhotoInputError ? 400 : error instanceof SubjectAccountError ? error.status : 500 }
     );
   }
 }
