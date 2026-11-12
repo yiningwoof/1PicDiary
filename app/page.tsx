@@ -31,7 +31,7 @@ const lastSavedKey = (subjectId: string) => `1picdiary:last-saved:v1:${subjectId
 function readStoredEntry<T extends DiaryDraft | SavedEntryReminder>(key: string, timeField: 'updatedAt' | 'savedAt'): T | null {
   try {
     const entry = JSON.parse(window.localStorage.getItem(key) ?? 'null') as Record<string, unknown> | null;
-    if (!entry || typeof entry.diaryText !== 'string' || !entry.diaryText.trim() || entry.diaryText.length > 80 || typeof entry.diaryDate !== 'string' || !isDiaryDate(entry.diaryDate) || typeof entry[timeField] !== 'string') return null;
+    if (!entry || typeof entry.diaryText !== 'string' || !entry.diaryText.trim() || typeof entry.diaryDate !== 'string' || !isDiaryDate(entry.diaryDate) || typeof entry[timeField] !== 'string') return null;
     return entry as T;
   } catch {
     return null;
@@ -338,7 +338,6 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
             setLayoutReady(false);
             setSaveState({ kind: 'idle' });
           }}
-          maxLength={80}
           placeholder='For example: We built blocks together and laughed all afternoon.'
         />
         {draftNotice ? <p role='status' className='text-xs font-medium text-violet-700'>{draftNotice}</p> : null}

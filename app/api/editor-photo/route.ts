@@ -16,12 +16,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Choose a photo to inspect and edit.' }, { status: 400 });
     }
     uploadedFile = file;
-    if (file.size > 30 * 1024 * 1024) {
-      return NextResponse.json({
-        error: 'The file is over the 30 MB upload limit.',
-        details: { ...fileDetails(file), detectedFormat: 'Not inspected', reason: 'file-too-large' },
-      }, { status: 400 });
-    }
     const { data, info, sourceFormat, outputFormat, decoder } = await orientedPhoto(Buffer.from(await file.arrayBuffer()));
     if (info.width < 32 || info.height < 32 || info.width > 16000 || info.height > 16000) {
       return NextResponse.json({

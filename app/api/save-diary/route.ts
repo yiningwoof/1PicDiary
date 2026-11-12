@@ -1,7 +1,7 @@
 import { parseTextLayout, LayoutValidationError } from '@/lib/text-layout';
 import { NextResponse } from "next/server";
 
-import { GooglePhotosError, uploadPhotoToGooglePhotos } from "@/lib/google-photos";
+import { fitGooglePhotosDescription, GooglePhotosError, uploadPhotoToGooglePhotos } from "@/lib/google-photos";
 import { addDiaryDateMetadata } from "@/lib/google-photo-metadata";
 import {
   composeDiaryImageWithLayout,
@@ -61,9 +61,6 @@ export async function POST(request: Request) {
     }
     const subjectName = subject.name;
 
-    if (file.size > 30 * 1024 * 1024 || diaryText.length > 80 || subjectName.length > 80) {
-      return NextResponse.json({ error: 'Choose a photo up to 30 MB and a diary line up to 80 characters.' }, { status: 400 });
-    }
     const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
     const safeSubjectName = sanitizeFileSegment(subjectName, "subject");
@@ -83,16 +80,20 @@ export async function POST(request: Request) {
 
     const albumId = subject.google_diary_album_id;
     const datedDiaryImage = await addDiaryDateMetadata(composed.imageBuffer, diaryDate);
+    const googleDescription = fitGooglePhotosDescription(diaryText);
+    const warnings: string[] = [];
+    if (googleDescription !== diaryText.trim()) {
+      warnings.push("The full diary text is on the diary image and in 1PicDiary. Google Photos limits descriptions to 999 characters, so its description was shortened.");
+    }
     const mediaItemId = await uploadPhotoToGooglePhotos({
       accessToken,
       albumId,
       fileName: `${safeSubjectName}-${diaryDate}-${Date.now()}.jpg`,
       imageBuffer: datedDiaryImage,
       mimeType: "image/jpeg",
-      description: diaryText,
+      description: googleDescription,
     });
 
-    const warnings: string[] = [];
     let originalMediaItemId: string | null = null;
     if (subject.save_originals) {
       try {
@@ -102,7 +103,7 @@ export async function POST(request: Request) {
           fileName: file.name,
           imageBuffer,
           mimeType: file.type || "application/octet-stream",
-          description: diaryText,
+          description: googleDescription,
         });
       } catch {
         warnings.push("The diary image was saved, but the original photo upload could not be confirmed. Check the originals album before retrying; do not re-upload the whole diary just to retry the original.");

@@ -5,6 +5,12 @@ type Album = {
   title: string;
 };
 
+const GOOGLE_PHOTOS_DESCRIPTION_MAX_LENGTH = 999;
+
+export function fitGooglePhotosDescription(description: string) {
+  return Array.from(description.trim()).slice(0, GOOGLE_PHOTOS_DESCRIPTION_MAX_LENGTH).join("");
+}
+
 export class GooglePhotosError extends Error {
   constructor(message: string, public readonly status: number) {
     super(message);

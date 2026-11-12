@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { uploadPhotoToGooglePhotos } from '@/lib/google-photos';
+import { fitGooglePhotosDescription, uploadPhotoToGooglePhotos } from '@/lib/google-photos';
 afterEach(() => vi.unstubAllGlobals());
 describe('Google Photos upload result', () => {
   it('sends the user-written diary text as the media item description', async () => {
@@ -36,6 +36,12 @@ describe('Google Photos upload result', () => {
       imageBuffer: Buffer.from('photo'), description: 'x'.repeat(1000),
     })).rejects.toThrow('shorter than 1000');
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('shortens only the Google Photos description without limiting diary text', () => {
+    const diaryText = '记'.repeat(1200);
+    expect(fitGooglePhotosDescription(diaryText)).toHaveLength(999);
+    expect(diaryText).toHaveLength(1200);
   });
 
   it('does not report success when the batch HTTP response contains a failed item', async () => {
