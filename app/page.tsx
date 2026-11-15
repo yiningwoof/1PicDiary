@@ -13,6 +13,8 @@ import { TextLayoutEditor } from '@/components/text-layout-editor';
 import type { TextLayout } from '@/lib/text-layout';
 import { diaryOverlayText } from '@/lib/diary-overlay-text';
 import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from '@/lib/upload-limits';
+import { DiaryIdeas } from '@/components/diary-ideas';
+import type { DiaryIdea } from '@/lib/diary-ideas';
 
 type DiaryDraft = {
   diaryText: string;
@@ -52,7 +54,7 @@ function friendlyTime(value: string) {
 export default function Home() {
   return (
     <SubjectDiaries>
-      {(subject) => <DiaryEditor subject={subject} />}
+      {(subject) => <DiaryEditor key={subject.id} subject={subject} />}
     </SubjectDiaries>
   );
 }
@@ -65,6 +67,8 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
   const [recoveryDraft, setRecoveryDraft] = useState<DiaryDraft | null>(null);
   const [lastSaved, setLastSaved] = useState<SavedEntryReminder | null>(null);
   const [draftNotice, setDraftNotice] = useState('');
+  const [selectedIdea, setSelectedIdea] = useState<DiaryIdea | null>(null);
+  const [consumedIdeaId, setConsumedIdeaId] = useState<string | null>(null);
   const [layout, setLayout] = useState<TextLayout | null>(null);
   const [layoutReady, setLayoutReady] = useState(false);
   const [photoVersion, setPhotoVersion] = useState(0);
@@ -116,6 +120,16 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
     setRecoveryDraft(null);
   }
 
+  function useDiaryIdea(idea: DiaryIdea) {
+    setSelectedIdea(idea);
+    setConsumedIdeaId(null);
+    setDiaryText(idea.idea_text);
+    setRecoveryDraft(null);
+    storeDraft(idea.idea_text, diaryDate);
+    setLayoutReady(false);
+    setSaveState({ kind: 'idle' });
+  }
+
   function discardDraft() {
     try { window.localStorage.removeItem(draftKey(subject.id)); } catch { /* The in-memory draft can still be dismissed. */ }
     setRecoveryDraft(null);
@@ -158,6 +172,7 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       formData.set('textLayout', JSON.stringify(layout));
       formData.set('subjectId', subject.id);
       formData.set('diaryDate', diaryDate);
+      if (selectedIdea) formData.set('ideaId', selectedIdea.id);
 
       const response = await fetch('/api/save-diary', {
         method: 'POST',
@@ -187,6 +202,10 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
       setRecoveryDraft(null);
       setLastSaved(savedEntry);
       setDraftNotice('');
+      if (typeof payload.consumedIdeaId === 'string') {
+        setConsumedIdeaId(payload.consumedIdeaId);
+        setSelectedIdea(null);
+      }
 
       setSaveState({
         kind: 'success',
@@ -276,6 +295,15 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           <Button type='button' variant='outline' className='mt-3' onClick={() => applyEntry(lastSaved)}>Use text and date again</Button>
         </div>
       ) : null}
+      <DiaryIdeas
+        key={`${subject.id}:${consumedIdeaId ?? 'active'}`}
+        subjectId={subject.id}
+        subjectName={subjectName}
+        disabled={saving}
+        selectedIdeaId={selectedIdea?.id ?? null}
+        onUse={useDiaryIdea}
+        onClearSelection={() => setSelectedIdea(null)}
+      />
       <fieldset
         disabled={saving}
         className='grid min-w-0 gap-3 rounded-3xl border border-white/80 bg-white/85 p-5 shadow-lg shadow-violet-100/50 backdrop-blur sm:p-7'
@@ -348,6 +376,12 @@ function DiaryEditor({ subject }: { subject: DiarySubject }) {
           }}
           placeholder='For example: We built blocks together and laughed all afternoon.'
         />
+        {selectedIdea ? (
+          <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900'>
+            <span>This text came from your memory inbox. You can edit it before saving.</span>
+            <Button type='button' variant='outline' className='min-h-9 px-3 py-1' onClick={() => setSelectedIdea(null)}>Keep text, unlink idea</Button>
+          </div>
+        ) : null}
         {draftNotice ? <p role='status' className='text-xs font-medium text-violet-700'>{draftNotice}</p> : null}
 
         {photo && diaryText.trim() && (

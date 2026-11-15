@@ -34,6 +34,16 @@ create table if not exists public.diaries (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.diary_ideas (
+  id uuid primary key default gen_random_uuid(),
+  subject_id uuid not null references public.subjects(id) on delete cascade,
+  idea_text text not null check (length(trim(idea_text)) > 0),
+  used_in_diary_id bigint references public.diaries(id) on delete set null,
+  used_at timestamptz,
+  created_at timestamptz not null default now(),
+  check ((used_at is null and used_in_diary_id is null) or used_at is not null)
+);
+
 create table if not exists public.google_sessions (
   id uuid primary key,
   google_owner_id text not null,
@@ -50,11 +60,14 @@ create index if not exists google_sessions_expiry on public.google_sessions (ses
 
 create index if not exists diaries_subject_date
   on public.diaries (subject_id, diary_date);
+create index if not exists diary_ideas_subject_unused
+  on public.diary_ideas (subject_id, created_at desc) where used_at is null;
 
 -- Only the server service role accesses records. Authorize diary access through
 -- the related subject's google_owner_id; never trust a browser-supplied owner.
 alter table public.subjects enable row level security;
 alter table public.diaries enable row level security;
+alter table public.diary_ideas enable row level security;
 alter table public.google_sessions enable row level security;
 
 -- New tables are not automatically exposed to Data API roles. Only the
@@ -62,10 +75,12 @@ alter table public.google_sessions enable row level security;
 grant usage on schema public to service_role;
 grant select, insert, update, delete on table public.subjects to service_role;
 grant select, insert, update, delete on table public.diaries to service_role;
+grant select, insert, update, delete on table public.diary_ideas to service_role;
 grant select, insert, update, delete on table public.google_sessions to service_role;
 grant usage, select on sequence public.diaries_id_seq to service_role;
 revoke all on table public.subjects from anon, authenticated;
 revoke all on table public.diaries from anon, authenticated;
+revoke all on table public.diary_ideas from anon, authenticated;
 revoke all on table public.google_sessions from anon, authenticated;
 revoke all on sequence public.diaries_id_seq from anon, authenticated;
 
@@ -108,6 +123,21 @@ comment on column public.diaries.google_original_media_item_id is
   'Google Photos media item ID for the unchanged original photo; null when originals are disabled or its upload failed.';
 comment on column public.diaries.created_at is
   'Timestamp when this database record was created.';
+
+comment on table public.diary_ideas is
+  'Subject-specific memory notes waiting to be used as diary entry text.';
+comment on column public.diary_ideas.id is
+  'Stable identifier for a saved diary idea.';
+comment on column public.diary_ideas.subject_id is
+  'Subject this memory belongs to; deleting the subject also deletes its ideas.';
+comment on column public.diary_ideas.idea_text is
+  'User-captured memory, quote, milestone, or other possible diary text.';
+comment on column public.diary_ideas.used_in_diary_id is
+  'Diary entry created from this idea; null until the diary is saved.';
+comment on column public.diary_ideas.used_at is
+  'Time this idea was consumed by a successfully recorded diary entry.';
+comment on column public.diary_ideas.created_at is
+  'Time the user captured this memory idea.';
 
 comment on table public.google_sessions is
   'Server-managed Google OAuth sessions. Browsers receive only the random session ID; token values remain encrypted at rest.';

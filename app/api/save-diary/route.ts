@@ -17,6 +17,7 @@ import { SubjectAccountError, getSubjectAccount } from "@/lib/subject-account";
 import { sanitizeFileSegment } from "@/lib/security";
 import { isDiaryDate } from "@/lib/diary-date";
 import { exceedsGooglePhotosPhotoLimit, googlePhotosPhotoLimitMessage } from "@/lib/upload-limits";
+import { UUID_PATTERN } from "@/lib/diary-ideas";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     const subjectId = String(formData.get("subjectId") ?? "").trim();
     const diaryDate = String(formData.get("diaryDate") ?? "").trim();
     const diaryText = String(formData.get("diaryText") ?? "").trim();
+    const ideaId = String(formData.get("ideaId") ?? "").trim();
     const textPosition = String(formData.get("textPosition") ?? "bottom") as TextPosition;
 
     if (!(file instanceof File)) {
@@ -64,6 +66,16 @@ export async function POST(request: Request) {
       throw new SubjectAccountError("The originals album is missing from this subject’s settings. Finish album setup before saving.", 409);
     }
     const subjectName = subject.name;
+
+    if (ideaId) {
+      if (!UUID_PATTERN.test(ideaId)) {
+        throw new SubjectAccountError("The selected diary idea is not valid. Choose it again or write new text.", 400);
+      }
+      const { data: idea, error: ideaError } = await profileDb.from("diary_ideas").select("id")
+        .eq("id", ideaId).eq("subject_id", subject.id).is("used_at", null).maybeSingle();
+      if (ideaError) throw new SubjectAccountError("The selected diary idea could not be checked. Apply the diary ideas migration and retry.", 503);
+      if (!idea) throw new SubjectAccountError("That diary idea has already been used or removed. Choose another idea.", 409);
+    }
 
     const fontFamilyInput = formData.get("fontFamily");
     const imageBuffer = Buffer.from(await file.arrayBuffer());
@@ -114,8 +126,9 @@ export async function POST(request: Request) {
       }
     }
     // The image lives only in Google Photos. Supabase keeps its reference and metadata.
+    let consumedIdeaId: string | null = null;
     try {
-      const insert = await profileDb.from("diaries").insert({
+      const diaryInsert = profileDb.from("diaries").insert({
         subject_id: subject.id,
         diary_text: diaryText,
         diary_date: diaryDate,
@@ -123,8 +136,18 @@ export async function POST(request: Request) {
         google_media_item_id: mediaItemId,
         google_original_media_item_id: originalMediaItemId,
       });
+      const insert = ideaId ? await diaryInsert.select("id").single() : await diaryInsert;
       if (insert.error) {
         warnings.push("The image was saved to Google Photos, but the diary record could not be saved. Check the database setup; do not upload the photo again.");
+      } else if (ideaId && !insert.data) {
+        warnings.push("The diary was saved, but its memory-inbox item could not be linked to the diary record. You can delete that item manually.");
+      } else if (ideaId && insert.data) {
+        const used = await profileDb.from("diary_ideas").update({
+          used_at: new Date().toISOString(), used_in_diary_id: insert.data.id,
+        }).eq("id", ideaId).eq("subject_id", subject.id).is("used_at", null).select("id").maybeSingle();
+        if (used.error || !used.data) {
+          warnings.push("The diary was saved, but its memory-inbox item could not be marked as used. You can delete that item manually.");
+        } else consumedIdeaId = ideaId;
       }
     } catch {
       warnings.push("The image was saved to Google Photos, but the diary record could not be confirmed. Check the database before retrying.");
@@ -134,6 +157,7 @@ export async function POST(request: Request) {
       success: true,
       mediaItemId,
       originalMediaItemId,
+      consumedIdeaId,
       warnings,
     });
   } catch (error) {
