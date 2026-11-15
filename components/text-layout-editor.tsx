@@ -2,13 +2,13 @@
 
 import { useEffect, useId, useRef, useState, type PointerEvent, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { DEFAULT_LAYOUT, boundLayout, clamp, resizeLayoutHeight, resizeLayoutWidth, scaleLayout, type Point, type TextLayout } from '@/lib/text-layout';
+import { DEFAULT_LAYOUT, boundLayout, clamp, resizeLayoutHeightFromTop, resizeLayoutWidth, scaleLayout, type Point, type TextLayout } from '@/lib/text-layout';
 
 type FileDetails = { fileName?: string; extension?: string; reportedMimeType?: string; detectedFormat?: string; reason?: string };
 type ConversionDetails = FileDetails & { editingFormat: string; decoder: string };
 type PhotoPreview = { url: string; width: number; height: number; conversion: ConversionDetails };
 type Layer = { url: string; key: string };
-type GestureMode = 'move' | 'width' | 'height' | 'scale';
+type GestureMode = 'move' | 'width' | 'height-top' | 'scale';
 type Gesture = { layout: TextLayout; points: Point[]; mode: GestureMode };
 
 function rasterKey(text: string, photo: PhotoPreview | null, layout: TextLayout) {
@@ -174,7 +174,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
     rebase(points.current.size === 2
       ? 'scale'
       : target.closest('[data-width-handle]') ? 'width'
-        : target.closest('[data-height-handle]') ? 'height' : 'move');
+        : target.closest('[data-top-height-handle]') ? 'height-top' : 'move');
   }
   function move(event: PointerEvent<HTMLDivElement>) {
     if (!points.current.has(event.pointerId) || !gesture.current || !source) return;
@@ -191,8 +191,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
       update({ ...scaled, box: { ...scaled.box, x: scaled.box.x + after.x - before.x, y: scaled.box.y + after.y - before.y } });
     } else if (start.mode === 'width') {
       update(resizeLayoutWidth(start.layout, now[0].x - start.points[0].x));
-    } else if (start.mode === 'height') {
-      update(resizeLayoutHeight(start.layout, now[0].y - start.points[0].y));
+    } else if (start.mode === 'height-top') {
+      update(resizeLayoutHeightFromTop(start.layout, now[0].y - start.points[0].y));
     } else {
       update({ ...start.layout, box: { ...start.layout.box,
         x: start.layout.box.x + now[0].x - start.points[0].x,
@@ -220,7 +220,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   return (
     <section className='grid min-w-0 gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-violet-50/70 p-4' aria-label='Text layout editor'>
       <h3 className='text-lg font-bold text-violet-950'>Position your text</h3>
-      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag inside the box to move it. Drag the right bar to change only its width or the bottom bar to change only its height. Pinch with two fingers to scale the entire box proportionally. You can scroll outside the photo.</p>
+      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag inside the box to move it. Drag the right bar to change its width or the top bar to change its height. Text automatically uses the largest size that fits after resizing. Pinch with two fingers to scale the entire box proportionally. You can scroll outside the photo.</p>
       <div className='rounded-xl border border-cyan-200 bg-white/80 p-3 text-sm text-slate-700' role='status'>
         <strong>Photo status:</strong> {photoStatus}
         {source?.conversion && (
@@ -249,7 +249,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
               <span data-width-handle aria-hidden='true' className='absolute right-0 top-1/2 flex h-16 w-11 -translate-y-1/2 cursor-ew-resize touch-none items-center justify-end pr-1'>
                 <span className='h-12 w-1.5 rounded-full bg-fuchsia-600 shadow-md ring-2 ring-white/80' />
               </span>
-              <span data-height-handle aria-hidden='true' className='absolute bottom-0 left-1/2 flex h-11 w-16 -translate-x-1/2 cursor-ns-resize touch-none items-end justify-center pb-1'>
+              <span data-top-height-handle aria-hidden='true' className='absolute left-1/2 top-0 flex h-11 w-16 -translate-x-1/2 cursor-ns-resize touch-none items-start justify-center pt-1'>
                 <span className='h-1.5 w-12 rounded-full bg-fuchsia-600 shadow-md ring-2 ring-white/80' />
               </span>
             </div>

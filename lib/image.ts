@@ -219,19 +219,42 @@ export async function renderTextLayer(text: string, width: number, height: numbe
   const pixelWidth = Math.max(1, Math.min(width - 2 * marginX, Math.round(layout.box.width * width)));
   const pixelHeight = Math.max(1, Math.min(height - 2 * marginY, Math.round(layout.box.height * height)));
   const outline = Math.max(0, layout.strokeWidth * width);
-  let fontSize = Math.max(1, layout.fontSize * width);
+  const maximumFontSize = Math.max(1, layout.fontSize * width);
+  let fontSize = maximumFontSize;
   let padding = 0;
   let lines: string[] = [];
   let contentHeight = 0;
-  // Width controls wrapping and height controls the available text region.
-  // Shrink the font only when the complete block cannot fit that region.
-  for (let attempt = 0; attempt < 150; attempt++) {
-    padding = Math.ceil(fontSize * 0.3 + outline + 2);
-    lines = wrapText(text, fontSize, Math.max(1, pixelWidth - 2 * padding));
-    contentHeight = Math.ceil(lines.length * fontSize * 1.4 + 2 * padding);
-    if (contentHeight <= pixelHeight && padding * 2 < pixelWidth) break;
-    fontSize *= 0.9;
+  const measureLayout = (candidate: number) => {
+    const candidatePadding = Math.ceil(candidate * 0.3 + outline + 2);
+    const candidateLines = wrapText(text, candidate, Math.max(1, pixelWidth - 2 * candidatePadding));
+    const candidateHeight = Math.ceil(candidateLines.length * candidate * 1.4 + 2 * candidatePadding);
+    return { padding: candidatePadding, lines: candidateLines, contentHeight: candidateHeight,
+      fits: candidateHeight <= pixelHeight && candidatePadding * 2 < pixelWidth };
+  };
+  // Find the largest font that fits both dimensions. This avoids the unused
+  // space left by repeatedly shrinking the font in coarse ten-percent steps.
+  let low = 1;
+  let high = maximumFontSize;
+  let measured = measureLayout(low);
+  if (!measured.fits) {
+    throw new Error('This text box is too small for the text and outline. Increase its width or height, reduce the outline, or use a larger image.');
   }
+  const maximum = measureLayout(high);
+  if (maximum.fits) {
+    low = high;
+    measured = maximum;
+  } else {
+    for (let attempt = 0; attempt < 18; attempt++) {
+      const candidate = (low + high) / 2;
+      const result = measureLayout(candidate);
+      if (result.fits) {
+        low = candidate;
+        measured = result;
+      } else high = candidate;
+    }
+  }
+  fontSize = low;
+  ({ padding, lines, contentHeight } = measured);
   if (contentHeight > pixelHeight || padding * 2 >= pixelWidth) {
     throw new Error('This text box is too small for the text and outline. Increase its width or height, reduce the outline, or use a larger image.');
   }
