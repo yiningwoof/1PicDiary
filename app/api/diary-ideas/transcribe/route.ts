@@ -42,7 +42,17 @@ export async function POST(request: Request) {
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: summaryModel,
-        instructions: 'Turn the transcript into a concise, natural written diary memory in the same primary language. Preserve every fact, name, direct quote, and Chinese-English code-switch. Do not invent details. Do not add a date, heading, or commentary. Return only the polished memory.',
+        instructions: [
+          'Rewrite the transcript as an extremely concise diary note in the same primary language.',
+          'Keep only concrete information the speaker actually provided, including important names, events, and exact quotes.',
+          'Preserve natural Chinese-English code-switching.',
+          'Remove filler words, repetition, false starts, and unnecessary transitions.',
+          'Never invent, infer, explain, praise, dramatize, moralize, or add emotion, context, conclusions, or significance.',
+          'Do not add generic phrases such as “值得记录”, “小小里程碑”, “温馨时刻”, “珍贵回忆”, or their equivalents.',
+          'Do not add a date, title, heading, introduction, closing sentence, or commentary.',
+          'Use as few words as possible without losing a concrete fact or important quote, because the text must fit in a small area on a photo.',
+          'Return only the final diary text.',
+        ].join(' '),
         input: transcript,
         reasoning: { effort: 'none' },
         max_output_tokens: 600,
