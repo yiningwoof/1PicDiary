@@ -38,6 +38,13 @@ create table if not exists public.diary_ideas (
   id uuid primary key default gen_random_uuid(),
   subject_id uuid not null references public.subjects(id) on delete cascade,
   idea_text text not null check (length(trim(idea_text)) > 0),
+  source_type text not null default 'typed' check (source_type in ('typed', 'voice')),
+  raw_transcript text,
+  audio_duration_seconds integer check (audio_duration_seconds between 1 and 120),
+  transcription_model text,
+  summary_model text,
+  ai_input_tokens integer check (ai_input_tokens is null or ai_input_tokens >= 0),
+  ai_output_tokens integer check (ai_output_tokens is null or ai_output_tokens >= 0),
   used_in_diary_id bigint references public.diaries(id) on delete set null,
   used_at timestamptz,
   created_at timestamptz not null default now(),
@@ -131,7 +138,14 @@ comment on column public.diary_ideas.id is
 comment on column public.diary_ideas.subject_id is
   'Subject this memory belongs to; deleting the subject also deletes its ideas.';
 comment on column public.diary_ideas.idea_text is
-  'User-captured memory, quote, milestone, or other possible diary text.';
+  'Editable final memory text; for voice entries this is the AI draft after any user edits.';
+comment on column public.diary_ideas.source_type is 'Whether the memory was typed or created from a voice recording.';
+comment on column public.diary_ideas.raw_transcript is 'Original speech transcript for a voice memory; audio itself is not stored.';
+comment on column public.diary_ideas.audio_duration_seconds is 'Length of the voice recording, capped at 120 seconds.';
+comment on column public.diary_ideas.transcription_model is 'OpenAI model used to transcribe the recording.';
+comment on column public.diary_ideas.summary_model is 'OpenAI model used to turn the transcript into a written memory.';
+comment on column public.diary_ideas.ai_input_tokens is 'Input tokens reported for the written-summary request.';
+comment on column public.diary_ideas.ai_output_tokens is 'Output tokens reported for the written-summary request.';
 comment on column public.diary_ideas.used_in_diary_id is
   'Diary entry created from this idea; null until the diary is saved.';
 comment on column public.diary_ideas.used_at is
