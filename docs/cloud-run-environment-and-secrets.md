@@ -11,7 +11,7 @@ flowchart LR
 
     subgraph Runtime[Cloud Run revision]
       PublicEnv[Regular environment variables\nAPP_URL\nGOOGLE_CLIENT_ID\nGOOGLE_REDIRECT_URI\nSUPABASE_URL]
-      SecretEnv[Secret-backed environment variables\nGOOGLE_CLIENT_SECRET\nGOOGLE_TOKEN_ENCRYPTION_KEY\nSUPABASE_SECRET_KEY]
+      SecretEnv[Secret-backed environment variables\nGOOGLE_CLIENT_SECRET\nGOOGLE_TOKEN_ENCRYPTION_KEY\nSUPABASE_SECRET_KEY\nOPENAI_API_KEY]
     end
 
     SecretManager[Google Secret Manager] -->|injects secret value at runtime| SecretEnv
@@ -20,6 +20,7 @@ flowchart LR
     App --> GoogleOAuth[Google OAuth and Photos APIs]
     App --> Supabase[Supabase Postgres]
     App -->|encrypt and decrypt Google tokens| Sessions[google_sessions table]
+    App -->|transcribe and polish voice memories| OpenAI[OpenAI API]
 ```
 
 An **environment variable** is the name through which the running Next.js
@@ -53,6 +54,9 @@ literal characters. It does not retrieve the secret.
 | `GOOGLE_CLIENT_SECRET` | Yes | Secret Manager: `google-client-secret` | Proves the server is the owner of the Google OAuth client when exchanging or refreshing tokens. Never expose it to browser code. |
 | `GOOGLE_TOKEN_ENCRYPTION_KEY` | Yes | Secret Manager: `google-token-encryption-key` | A base64-encoded 32-byte AES-256 key used by Next.js to encrypt Google access and refresh tokens before writing them to Supabase. Keep the same value across revisions. |
 | `SUPABASE_SECRET_KEY` | Yes | Secret Manager: `supabase-secret-key` | Privileged server key used to access tables protected from public clients, including `subjects`, `diaries`, and `google_sessions`. It currently starts with `sb_secret_`. |
+| `OPENAI_API_KEY` | Yes | Secret Manager: `openai-api-key` | Server-only key used to transcribe a voice memory and turn its transcript into an editable written draft. Audio is sent directly for processing and is not stored by 1PicDiary. |
+| `OPENAI_TRANSCRIPTION_MODEL` | No | Optional regular value | Overrides the transcription model. Defaults to `gpt-transcribe`. |
+| `OPENAI_SUMMARY_MODEL` | No | Optional regular value | Overrides the written-summary model. Defaults to `gpt-6-luna`. |
 
 The code temporarily accepts `SUPABASE_SERVICE_ROLE_KEY` as a legacy fallback,
 but new configuration should use `SUPABASE_SECRET_KEY`.
@@ -75,6 +79,7 @@ alternate Cloud Run hostnames should redirect to one hostname.
 | `google-client-secret` | `GOOGLE_CLIENT_SECRET` | `latest` |
 | `google-token-encryption-key` | `GOOGLE_TOKEN_ENCRYPTION_KEY` | `latest` |
 | `supabase-secret-key` | `SUPABASE_SECRET_KEY` | `latest` |
+| `openai-api-key` | `OPENAI_API_KEY` | `latest` |
 
 The Cloud Run revision service account is:
 
@@ -82,7 +87,7 @@ The Cloud Run revision service account is:
 844649524292-compute@developer.gserviceaccount.com
 ```
 
-It needs the **Secret Manager Secret Accessor** role for all three secrets.
+It needs the **Secret Manager Secret Accessor** role for all four secrets.
 
 ## Where to set them in the Cloud Run UI
 
@@ -118,6 +123,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3001/api/auth/google/callback
 GOOGLE_TOKEN_ENCRYPTION_KEY=actual-base64-key
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SECRET_KEY=actual-sb-secret-key
+OPENAI_API_KEY=actual-openai-api-key
 ```
 
 Use the port on which the local server is actually running. The local redirect
