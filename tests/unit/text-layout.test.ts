@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { DEFAULT_LAYOUT, boundLayout, parseTextLayout, resizeLayoutHeight, resizeLayoutWidth, scaleLayout } from '@/lib/text-layout';
+import { DEFAULT_LAYOUT, MAX_LAYOUT_FONT_SIZE, boundLayout, parseTextLayout, resizeLayoutHeightFromTop, resizeLayoutWidth, scaleLayout } from '@/lib/text-layout';
 import { composeDiaryImageWithLayout, orientedPhoto, renderTextLayer } from '@/lib/image';
 
 describe('text layout', () => {
@@ -24,16 +24,18 @@ describe('text layout', () => {
     expect(next.fontSize).toBeCloseTo(layout.fontSize * 1.5);
     expect(next.strokeWidth).toBeCloseTo(.003);
   });
-  it('resizes width and height independently without changing text scale', () => {
+  it('resizes width independently and requests an automatic best fit', () => {
     const wider = resizeLayoutWidth(DEFAULT_LAYOUT, -.2);
     expect(wider.box.width).toBeCloseTo(DEFAULT_LAYOUT.box.width - .2);
     expect(wider.box.height).toBe(DEFAULT_LAYOUT.box.height);
-    expect(wider.fontSize).toBe(DEFAULT_LAYOUT.fontSize);
-
-    const taller = resizeLayoutHeight(DEFAULT_LAYOUT, .05);
-    expect(taller.box.height).toBeCloseTo(DEFAULT_LAYOUT.box.height + .05);
-    expect(taller.box.width).toBe(DEFAULT_LAYOUT.box.width);
-    expect(taller.fontSize).toBe(DEFAULT_LAYOUT.fontSize);
+    expect(wider.fontSize).toBe(MAX_LAYOUT_FONT_SIZE);
+  });
+  it('resizes from the top while keeping the bottom edge fixed', () => {
+    const resized = resizeLayoutHeightFromTop(DEFAULT_LAYOUT, -.08);
+    expect(resized.box.y).toBeCloseTo(DEFAULT_LAYOUT.box.y - .08);
+    expect(resized.box.y + resized.box.height).toBeCloseTo(DEFAULT_LAYOUT.box.y + DEFAULT_LAYOUT.box.height);
+    expect(resized.box.width).toBe(DEFAULT_LAYOUT.box.width);
+    expect(resized.fontSize).toBe(MAX_LAYOUT_FONT_SIZE);
   });
   it.each([{ ...DEFAULT_LAYOUT, version: 2 }, { ...DEFAULT_LAYOUT, color: '<svg>' }, { ...DEFAULT_LAYOUT, fontSize: NaN }, '{'])('rejects malformed layouts', value => {
     expect(() => parseTextLayout(value)).toThrow();
@@ -59,6 +61,13 @@ describe('text layout', () => {
     expect(tall.textLayout.box.height).toBeCloseTo(.3);
     expect(short.textLayout.box.height).toBeCloseTo(.1);
     expect(short.textLayout.fontSize).toBeLessThan(tall.textLayout.fontSize);
+  });
+  it('uses newly available width and height to maximize the fitted font', async () => {
+    const text = '11/12/2026\n今天 nanny Janie 来看我们啦，妈妈在布局中希望文字尽量填满空间。';
+    const small = await renderTextLayer(text, 1000, 1200, { ...DEFAULT_LAYOUT, fontSize: MAX_LAYOUT_FONT_SIZE, box: { ...DEFAULT_LAYOUT.box, width: .45, height: .12 } });
+    const large = await renderTextLayer(text, 1000, 1200, { ...DEFAULT_LAYOUT, fontSize: MAX_LAYOUT_FONT_SIZE, box: { ...DEFAULT_LAYOUT.box, width: .75, height: .25 } });
+    expect(large.textLayout.fontSize).toBeGreaterThan(small.textLayout.fontSize);
+    expect(large.textLayout.fontSize).toBeLessThanOrEqual(MAX_LAYOUT_FONT_SIZE);
   });
   it('exports the exact preview layer at the resolved coordinates', async () => {
     const image = await sharp({ create: { width: 700, height: 900, channels: 3, background: '#336699' } }).png().toBuffer();

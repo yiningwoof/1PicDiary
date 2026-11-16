@@ -22,6 +22,7 @@ export const DEFAULT_LAYOUT: TextLayout = {
   strokeWidth: 0.0035, alignment: 'left', fontWeight: 'bold',
 };
 export const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
+export const MAX_LAYOUT_FONT_SIZE = 0.16;
 
 export function boundLayout(layout: TextLayout): TextLayout {
   const width = clamp(layout.box.width, 0.15, 0.96);
@@ -34,14 +35,17 @@ export function boundLayout(layout: TextLayout): TextLayout {
 
 export type Point = { x: number; y: number };
 export function resizeLayoutWidth(layout: TextLayout, delta: number): TextLayout {
-  return boundLayout({ ...layout, source: 'manual', box: { ...layout.box,
+  return boundLayout({ ...layout, source: 'manual', fontSize: MAX_LAYOUT_FONT_SIZE, box: { ...layout.box,
     width: clamp(layout.box.width + delta, 0.15, 0.98 - layout.box.x),
   } });
 }
 
-export function resizeLayoutHeight(layout: TextLayout, delta: number): TextLayout {
-  return boundLayout({ ...layout, source: 'manual', box: { ...layout.box,
-    height: clamp(layout.box.height + delta, 0.05, 0.98 - layout.box.y),
+/** Resize from the top edge while keeping the bottom edge fixed. */
+export function resizeLayoutHeightFromTop(layout: TextLayout, delta: number): TextLayout {
+  const bottom = layout.box.y + layout.box.height;
+  const y = clamp(layout.box.y + delta, 0.02, bottom - 0.05);
+  return boundLayout({ ...layout, source: 'manual', fontSize: MAX_LAYOUT_FONT_SIZE, box: {
+    ...layout.box, y, height: bottom - y,
   } });
 }
 

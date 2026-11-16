@@ -39,6 +39,17 @@ function request(id: string, diaryDate = '2026-09-01', diaryText = 'A good day')
   return new Request('http://localhost/api/save-diary', { method: 'POST', body: form });
 }
 
+function chain(result: unknown) {
+  const query = { select: vi.fn(), eq: vi.fn(), is: vi.fn(), maybeSingle: vi.fn().mockResolvedValue(result),
+    single: vi.fn().mockResolvedValue(result), insert: vi.fn(), update: vi.fn() };
+  query.select.mockReturnValue(query);
+  query.eq.mockReturnValue(query);
+  query.is.mockReturnValue(query);
+  query.insert.mockReturnValue(query);
+  query.update.mockReturnValue(query);
+  return query;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.cookies.mockResolvedValue({ get: () => ({ value: 'token' }) });
@@ -93,6 +104,29 @@ describe('subject album routing', () => {
     expect(mocks.upload).toHaveBeenCalledWith(expect.objectContaining({ description: '记'.repeat(999) }));
     expect(db.query.insert).toHaveBeenCalledWith(expect.objectContaining({ diary_text: diaryText }));
     expect(payload.warnings[0]).toContain('description was shortened');
+  });
+  it('marks a selected memory-inbox item as used only after saving the diary record', async () => {
+    const subject = { id: '00000000-0000-4000-8000-000000000001', name: 'A', google_diary_album_id: 'album-a' };
+    const ideaId = '00000000-0000-4000-8000-000000000099';
+    const subjectQuery = chain({ data: subject });
+    const ideaLookup = chain({ data: { id: ideaId } });
+    const diaryInsert = chain({ data: { id: 42 }, error: null });
+    const ideaUpdate = chain({ data: { id: ideaId }, error: null });
+    let ideaCalls = 0;
+    const db = { from: vi.fn((table: string) => table === 'subjects' ? subjectQuery
+      : table === 'diaries' ? diaryInsert : ideaCalls++ === 0 ? ideaLookup : ideaUpdate) };
+    mocks.account.mockResolvedValue({ ownerId: 'owner', accessToken: 'token', supabase: db });
+    const saveRequest = request(subject.id);
+    const form = await saveRequest.formData();
+    form.set('ideaId', ideaId);
+
+    const response = await save(new Request('http://localhost/api/save-diary', { method: 'POST', body: form }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.consumedIdeaId).toBe(ideaId);
+    expect(ideaUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ used_in_diary_id: 42 }));
+    expect(ideaUpdate.update.mock.calls[0][0].used_at).toEqual(expect.any(String));
   });
   it('returns the Google reference with a warning if the metadata write fails', async () => {
     const subject = { id: '00000000-0000-4000-8000-000000000001', name: 'A', diary_album_title: 'A diary', google_diary_album_id: 'album-a' };
