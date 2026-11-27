@@ -86,6 +86,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   const current = useRef(layout);
   const points = useRef(new Map<number, Point>());
   const gesture = useRef<Gesture | null>(null);
+  const resizeBoxToFont = useRef(false);
   const signature = rasterKey(text, source, layout);
   const ready = Boolean(source && sourceLoaded && layer && layer.key === signature && layerLoaded === layer.url && !error && !gesturing);
 
@@ -134,7 +135,8 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
       try {
         const response = await fetch('/api/text-overlay', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-          body: JSON.stringify({ text, width: source.width, height: source.height, layout: current.current }),
+          body: JSON.stringify({ text, width: source.width, height: source.height, layout: current.current,
+            resizeBoxToFont: resizeBoxToFont.current }),
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error ?? 'Could not render text.');
@@ -143,6 +145,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
         // Keep the latest drag position even when a raster request was already in flight.
         const next = boundLayout({ ...resolved, box: { ...resolved.box, x: current.current.box.x, y: current.current.box.y } });
         current.current = next;
+        resizeBoxToFont.current = false;
         setLayout(next);
         setLayer({ url: result.url, key: rasterKey(text, source, next) });
         setError('');
@@ -220,7 +223,7 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
   return (
     <section className='grid min-w-0 gap-3 rounded-2xl border border-cyan-100 bg-gradient-to-br from-cyan-50/70 to-violet-50/70 p-4' aria-label='Text layout editor'>
       <h3 className='text-lg font-bold text-violet-950'>Position your text</h3>
-      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag inside the box to move it. Drag the right bar to change its width or the top bar to change its height. Text automatically uses the largest size that fits after resizing. Pinch with two fingers to scale the entire box proportionally. You can scroll outside the photo.</p>
+      <p id={`${id}-help`} className='text-sm text-slate-600'>Drag inside the box to move it. Drag the right bar to change its width or the top bar to change its height. Text automatically uses the largest size that fits after resizing. When you change Text size, the box grows or shrinks with it. Pinch with two fingers to scale the entire box proportionally. You can scroll outside the photo.</p>
       <div className='rounded-xl border border-cyan-200 bg-white/80 p-3 text-sm text-slate-700' role='status'>
         <strong>Photo status:</strong> {photoStatus}
         {source?.conversion && (
@@ -274,7 +277,10 @@ export function TextLayoutEditor({ photo, text, disabled, onChange }: {
           <Button type='button' variant='outline' onClick={() => update({ ...DEFAULT_LAYOUT, box: { ...DEFAULT_LAYOUT.box } })}>Reset layout</Button>
         </div>
         <NumberStepper label='Text size' value={layout.fontSize} min={0.008} max={0.16} step={0.001}
-          display={value => percent(value)} onChange={fontSize => update({ ...layout, fontSize })} />
+          display={value => percent(value)} onChange={fontSize => {
+            resizeBoxToFont.current = true;
+            update({ ...layout, fontSize });
+          }} />
         <details>
           <summary className='cursor-pointer py-2 text-sm font-medium'>Text style and precise position</summary>
           <div className='grid gap-3 pt-2'>

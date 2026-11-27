@@ -212,12 +212,18 @@ export function layoutFromLegacy(input: Omit<ComposeDiaryImageInput, 'imageBuffe
 }
 
 /** The editor displays this very same raster layer; export composites it at the saved coordinates. */
-export async function renderTextLayer(text: string, width: number, height: number, requested: TextLayout) {
-  const layout = boundLayout(requested);
+export async function renderTextLayer(
+  text: string,
+  width: number,
+  height: number,
+  requested: TextLayout,
+  options: { resizeBoxToFont?: boolean } = {},
+) {
+  let layout = boundLayout(requested);
   const marginX = Math.ceil(width * 0.02);
   const marginY = Math.ceil(height * 0.02);
   const pixelWidth = Math.max(1, Math.min(width - 2 * marginX, Math.round(layout.box.width * width)));
-  const pixelHeight = Math.max(1, Math.min(height - 2 * marginY, Math.round(layout.box.height * height)));
+  let pixelHeight = Math.max(1, Math.min(height - 2 * marginY, Math.round(layout.box.height * height)));
   const outline = Math.max(0, layout.strokeWidth * width);
   const maximumFontSize = Math.max(1, layout.fontSize * width);
   let fontSize = maximumFontSize;
@@ -231,6 +237,14 @@ export async function renderTextLayer(text: string, width: number, height: numbe
     return { padding: candidatePadding, lines: candidateLines, contentHeight: candidateHeight,
       fits: candidateHeight <= pixelHeight && candidatePadding * 2 < pixelWidth };
   };
+  if (options.resizeBoxToFont) {
+    const requestedSize = measureLayout(maximumFontSize);
+    const desiredHeight = clamp(requestedSize.contentHeight / height, 0.001, 0.96);
+    const previousBottom = layout.box.y + layout.box.height;
+    const y = clamp(previousBottom - desiredHeight, 0.02, 0.98 - desiredHeight);
+    layout = boundLayout({ ...layout, box: { ...layout.box, y, height: desiredHeight } });
+    pixelHeight = Math.max(1, Math.min(height - 2 * marginY, Math.round(layout.box.height * height)));
+  }
   // Find the largest font that fits both dimensions. This avoids the unused
   // space left by repeatedly shrinking the font in coarse ten-percent steps.
   let low = 1;
