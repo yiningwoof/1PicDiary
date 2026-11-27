@@ -69,6 +69,18 @@ describe('text layout', () => {
     expect(large.textLayout.fontSize).toBeGreaterThan(small.textLayout.fontSize);
     expect(large.textLayout.fontSize).toBeLessThanOrEqual(MAX_LAYOUT_FONT_SIZE);
   });
+  it('resizes the textbox when the user chooses a font size', async () => {
+    const text = '11/27/2026\n今天学会自己穿鞋了';
+    const initial = await renderTextLayer(text, 1000, 1200, DEFAULT_LAYOUT);
+    const requestedFontSize = initial.textLayout.fontSize * 1.5;
+    const resized = await renderTextLayer(text, 1000, 1200, {
+      ...initial.textLayout, fontSize: requestedFontSize,
+    }, { resizeBoxToFont: true });
+    expect(resized.textLayout.fontSize).toBeCloseTo(requestedFontSize, 4);
+    expect(resized.textLayout.box.height).toBeGreaterThan(initial.textLayout.box.height);
+    expect(resized.textLayout.box.y + resized.textLayout.box.height)
+      .toBeCloseTo(initial.textLayout.box.y + initial.textLayout.box.height, 3);
+  });
   it('exports the exact preview layer at the resolved coordinates', async () => {
     const image = await sharp({ create: { width: 700, height: 900, channels: 3, background: '#336699' } }).png().toBuffer();
     const layer = await renderTextLayer('9/1/2026\nA lovely day', 700, 900, DEFAULT_LAYOUT);
